@@ -1,0 +1,110 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject AuthService AuthService
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+
+@if (AuthService.IsAuthenticated)
+{
+    <MudLayout @onmousemove="HandleUserActivity"
+               @onmousedown="HandleUserActivity"
+               @onkeydown="HandleUserActivity"
+               tabindex="0">
+        <TopBar />
+        <MudDrawer Open="true"
+                   Variant="DrawerVariant.Persistent"
+                   Anchor="Anchor.Start"
+                   Elevation="0"
+                   ClipMode="DrawerClipMode.Always">
+            <Sidebar />
+        </MudDrawer>
+        <MudMainContent Class="soms-main-content">
+            <div class="soms-content-frame">
+                @Body
+            </div>
+        </MudMainContent>
+    </MudLayout>
+}
+
+@code {
+    private CancellationTokenSource? _sessionCancellationTokenSource;
+    private DotNetObjectReference<MainLayout>? _dotNetReference;
+
+    protected override void OnInitialized()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            NavManager.NavigateTo("/login");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        _sessionCancellationTokenSource = new CancellationTokenSource();
+        _dotNetReference = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("somsActivityTracker.start", _dotNetReference);
+        _ = MonitorSessionAsync(_sessionCancellationTokenSource.Token);
+    }
+
+    private Task HandleUserActivity()
+    {
+        AuthService.RecordActivity();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public void NotifyUserActivity()
+    {
+        AuthService.RecordActivity();
+    }
+
+    private async Task MonitorSessionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
+
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!AuthService.IsSessionExpired())
+                {
+                    continue;
+                }
+
+                await InvokeAsync(() =>
+                {
+                    AuthService.Logout();
+                    NavManager.NavigateTo("/login");
+                });
+
+                break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _sessionCancellationTokenSource?.Cancel();
+        _sessionCancellationTokenSource?.Dispose();
+        _dotNetReference?.Dispose();
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("somsActivityTracker.stop");
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

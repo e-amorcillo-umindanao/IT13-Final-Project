@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+.dotnet/
+.dotnet-home/
+*.user
+*.suo
+*.cache
+*.pdb
+*.db-shm
+*.db-wal
+*.log
+TestResults/

@@ -1,0 +1,460 @@
+@page "/members/{Id:int}"
+@layout MainLayout
+@inject MemberService MemberService
+@inject AuthService AuthService
+@inject EngagementService EngagementService
+@inject InteractionService InteractionService
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Member Details</PageTitle>
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_member is null)
+{
+    <EmptyState Message="Member not found." Icon="@Icons.Material.Filled.PersonOff" />
+}
+else
+{
+    <MudStack Spacing="3">
+        <div class="member-detail-topbar">
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       OnClick="GoBack">
+                Back
+            </MudButton>
+
+            <div class="member-detail-heading">
+                <MudText Typo="Typo.h5" Class="fw-bold" data-page-title="true">
+                    @_member.FirstName @_member.LastName
+                </MudText>
+            </div>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="OpenEditDialogAsync">
+                Edit
+            </MudButton>
+        </div>
+
+        <MudTabs Rounded="false" Class="member-detail-tabs">
+            <MudTabPanel Text="Profile">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" lg="7">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle1" Class="mb-4">Member Information</MudText>
+
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Student ID</MudText>
+                                    <MudText Typo="Typo.body1">@_member.StudentId</MudText>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Email</MudText>
+                                    <MudText Typo="Typo.body1">@DisplayValue(_member.Email)</MudText>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Phone</MudText>
+                                    <MudText Typo="Typo.body1">@DisplayValue(_member.PhoneNumber)</MudText>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Address</MudText>
+                                    <MudText Typo="Typo.body1">@DisplayValue(_member.Address)</MudText>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                                    <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small" Color="@GetStatusColor(_member.Status)">
+                                        @_member.Status
+                                    </MudChip>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Stage</MudText>
+                                    <MudChip T="string" Variant="Variant.Outlined" Size="Size.Small" Color="@GetStageColor(_member.RecruitmentStage)">
+                                        @_member.RecruitmentStage
+                                    </MudChip>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Join Date</MudText>
+                                    <MudText Typo="Typo.body1">@_member.JoinDate.ToString("MMMM dd, yyyy")</MudText>
+                                </div>
+                                <div class="member-detail-field">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Created by</MudText>
+                                    <MudText Typo="Typo.body1">@(_member.CreatedByUser?.Username ?? "-")</MudText>
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" lg="5">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                                    <MudText Typo="Typo.subtitle1">Committee Assignments</MudText>
+                                    @if (CanManageCommittees)
+                                    {
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.Add"
+                                                   OnClick="ToggleCommitteeForm">
+                                            Assign Committee
+                                        </MudButton>
+                                    }
+                                </MudStack>
+
+                                @if (_member.MemberCommittees.Count == 0)
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        No committees assigned yet.
+                                    </MudText>
+                                }
+                                else
+                                {
+                                    <MudStack Spacing="1" Class="mb-3">
+                                        @foreach (var assignment in _member.MemberCommittees.OrderBy(item => item.Committee.Name))
+                                        {
+                                            <MudPaper Class="member-committee-row pa-3" Elevation="0">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                    <div>
+                                                        <MudText Typo="Typo.body1">@assignment.Committee.Name</MudText>
+                                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                            @(string.IsNullOrWhiteSpace(assignment.CommitteeRole) ? "No role specified" : assignment.CommitteeRole)
+                                                        </MudText>
+                                                    </div>
+
+                                                    @if (CanManageCommittees)
+                                                    {
+                                                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                                                       Size="Size.Small"
+                                                                       Color="Color.Error"
+                                                                       OnClick="@(() => RemoveCommitteeAsync(assignment.MemberCommitteeId))" />
+                                                    }
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    </MudStack>
+                                }
+
+                                @if (CanManageCommittees && _showCommitteeForm)
+                                {
+                                    <MudGrid Spacing="2">
+                                        <MudItem xs="12" sm="6">
+                                            <MudSelect T="int?"
+                                                       Label="Committee"
+                                                       Variant="Variant.Outlined"
+                                                       Value="_selectedCommitteeId"
+                                                       ValueChanged="OnSelectedCommitteeChanged">
+                                                @foreach (var committee in _committees)
+                                                {
+                                                    <MudSelectItem T="int?" Value="@((int?)committee.CommitteeId)">@committee.Name</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="12" sm="4">
+                                            <MudTextField T="string"
+                                                          Label="Role"
+                                                          Variant="Variant.Outlined"
+                                                          Value="_selectedCommitteeRole"
+                                                          ValueChanged="OnSelectedCommitteeRoleChanged" />
+                                        </MudItem>
+                                        <MudItem xs="12" sm="2">
+                                            <MudButton Variant="Variant.Filled"
+                                                       Color="Color.Primary"
+                                                       FullWidth="true"
+                                                       Class="mt-sm-1"
+                                                       OnClick="AssignCommitteeAsync">
+                                                Assign
+                                            </MudButton>
+                                        </MudItem>
+                                    </MudGrid>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Engagement">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" lg="4">
+                        <MudCard Class="h-100">
+                            <MudCardContent>
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle1">Engagement Score</MudText>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.h3">@(_engagementBreakdown?.TotalScore ?? 0) / 100</MudText>
+                                        <EngagementBadge Score="@(_engagementBreakdown?.TotalScore ?? 0)" />
+                                    </MudStack>
+                                    <MudProgressLinear Value="@(_engagementBreakdown?.TotalScore ?? 0)"
+                                                       Color="@GetEngagementColor(_engagementBreakdown?.Label)"
+                                                       Rounded="true"
+                                                       Class="engagement-progress" />
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.AddComment"
+                                               OnClick="OpenMemberLogInteractionDialogAsync">
+                                        + Log Interaction
+                                    </MudButton>
+                                </MudStack>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" lg="8">
+                        <MudCard Class="h-100">
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle1" Class="mb-4">Score Breakdown</MudText>
+
+                                <MudStack Spacing="3">
+                                    <div class="engagement-breakdown-row">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.body1">Attendance Rate</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                @($"{(_engagementBreakdown?.AttendancePoints ?? 0):0.##}/50 pts")
+                                            </MudText>
+                                        </MudStack>
+                                        <MudProgressLinear Value="@GetBreakdownPercent(_engagementBreakdown?.AttendancePoints, 50)"
+                                                           Color="Color.Success"
+                                                           Rounded="true"
+                                                           Class="engagement-progress" />
+                                    </div>
+
+                                    <div class="engagement-breakdown-row">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.body1">Interaction Freq</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                @($"{(_engagementBreakdown?.InteractionPoints ?? 0):0.##}/30 pts")
+                                            </MudText>
+                                        </MudStack>
+                                        <MudProgressLinear Value="@GetBreakdownPercent(_engagementBreakdown?.InteractionPoints, 30)"
+                                                           Color="Color.Info"
+                                                           Rounded="true"
+                                                           Class="engagement-progress" />
+                                    </div>
+
+                                    <div class="engagement-breakdown-row">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.body1">Recency</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                @($"{(_engagementBreakdown?.RecencyPoints ?? 0):0.##}/20 pts")
+                                            </MudText>
+                                        </MudStack>
+                                        <MudProgressLinear Value="@GetBreakdownPercent(_engagementBreakdown?.RecencyPoints, 20)"
+                                                           Color="Color.Warning"
+                                                           Rounded="true"
+                                                           Class="engagement-progress" />
+                                    </div>
+                                </MudStack>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Attendance">
+                <MudPaper Class="page-surface">
+                    <MudText Typo="Typo.body1">Attendance history will appear here</MudText>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Interactions">
+                <MudCard>
+                    <MudCardContent>
+                        <MudStack Spacing="3">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle1">Interaction Timeline</MudText>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.AddComment"
+                                           OnClick="OpenMemberLogInteractionDialogAsync">
+                                    + Log Interaction
+                                </MudButton>
+                            </MudStack>
+
+                            <InteractionTimeline Interactions="_interactionLogs" OnChanged="ReloadEngagementDataAsync" />
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudTabPanel>
+        </MudTabs>
+    </MudStack>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Member? _member;
+    private EngagementBreakdown? _engagementBreakdown;
+    private List<InteractionLog> _interactionLogs = [];
+    private List<Committee> _committees = [];
+    private int? _selectedCommitteeId;
+    private string? _selectedCommitteeRole;
+    private bool _showCommitteeForm;
+    private bool _isLoading = true;
+
+    private bool CanManageCommittees => AuthService.CurrentRole is "Admin" or "Officer";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        await LoadPageDataAsync();
+        _isLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/members");
+    }
+
+    private async Task OpenEditDialogAsync()
+    {
+        if (_member is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            [nameof(AddEditMemberDialog.MemberId)] = _member.MemberId
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AddEditMemberDialog>("Edit Member", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadPageDataAsync();
+        }
+    }
+
+    private void ToggleCommitteeForm()
+    {
+        _showCommitteeForm = !_showCommitteeForm;
+    }
+
+    private void OnSelectedCommitteeChanged(int? value)
+    {
+        _selectedCommitteeId = value;
+    }
+
+    private void OnSelectedCommitteeRoleChanged(string? value)
+    {
+        _selectedCommitteeRole = value;
+    }
+
+    private async Task AssignCommitteeAsync()
+    {
+        if (_member is null || !_selectedCommitteeId.HasValue)
+        {
+            Snackbar.Add("Select a committee first.", Severity.Warning);
+            return;
+        }
+
+        await MemberService.AssignCommitteeAsync(_member.MemberId, _selectedCommitteeId.Value, _selectedCommitteeRole);
+        Snackbar.Add("Committee assignment updated.", Severity.Success);
+
+        _selectedCommitteeId = null;
+        _selectedCommitteeRole = null;
+        _showCommitteeForm = false;
+        await LoadPageDataAsync();
+    }
+
+    private async Task RemoveCommitteeAsync(int memberCommitteeId)
+    {
+        await MemberService.RemoveCommitteeAsync(memberCommitteeId);
+        Snackbar.Add("Committee assignment removed.", Severity.Success);
+        await LoadPageDataAsync();
+    }
+
+    private async Task LoadPageDataAsync()
+    {
+        var memberTask = MemberService.GetByIdAsync(Id);
+        var committeesTask = MemberService.GetCommitteesAsync();
+        var engagementTask = EngagementService.GetMemberEngagementAsync(Id);
+        var interactionsTask = InteractionService.GetByMemberAsync(Id);
+
+        await Task.WhenAll(memberTask, committeesTask, engagementTask, interactionsTask);
+
+        _member = await memberTask;
+        _committees = await committeesTask;
+        _engagementBreakdown = await engagementTask;
+        _interactionLogs = await interactionsTask;
+    }
+
+    private async Task ReloadEngagementDataAsync()
+    {
+        await LoadPageDataAsync();
+        StateHasChanged();
+    }
+
+    private async Task OpenMemberLogInteractionDialogAsync()
+    {
+        if (_member is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            [nameof(LogInteraction.MemberId)] = _member.MemberId,
+            [nameof(LogInteraction.IsMemberLocked)] = true
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<LogInteraction>("Log Interaction", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await ReloadEngagementDataAsync();
+        }
+    }
+
+    private static string DisplayValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static double GetBreakdownPercent(double? points, double maxPoints)
+        => maxPoints <= 0 ? 0 : Math.Clamp(((points ?? 0) / maxPoints) * 100, 0, 100);
+
+    private static Color GetStatusColor(string status)
+        => status switch
+        {
+            "Active" => Color.Success,
+            "Alumni" => Color.Info,
+            _ => Color.Default
+        };
+
+    private static Color GetStageColor(string stage)
+        => stage switch
+        {
+            "Prospect" => Color.Warning,
+            "Applicant" => Color.Info,
+            "Member" => Color.Success,
+            _ => Color.Default
+        };
+
+    private static Color GetEngagementColor(string? label)
+        => label switch
+        {
+            "High" => Color.Success,
+            "Medium" => Color.Warning,
+            "Low" => Color.Error,
+            _ => Color.Default
+        };
+}

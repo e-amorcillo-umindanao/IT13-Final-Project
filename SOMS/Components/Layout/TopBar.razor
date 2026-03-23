@@ -1,0 +1,36 @@
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<MudAppBar Elevation="0"
+           Dense="false"
+           Fixed="true"
+           Color="Color.Default"
+           Class="soms-topbar"
+           Style="border-bottom: 1px solid #E2E8F0; box-shadow: none;">
+    <div class="soms-topbar-content">
+        <div class="soms-topbar-title">
+            <MudText Typo="Typo.h6">SOMS</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">University of Mindanao</MudText>
+        </div>
+
+        <MudMenu Label="@(AuthService.CurrentUser?.Username ?? "Guest")"
+                 EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                 Variant="Variant.Text"
+                 Color="Color.Inherit">
+            <MudMenuItem OnClick="HandleLogout">
+                <MudIcon Icon="@Icons.Material.Filled.Logout"
+                         Size="Size.Small"
+                         Class="mr-2" />
+                Logout
+            </MudMenuItem>
+        </MudMenu>
+    </div>
+</MudAppBar>
+
+@code {
+    private void HandleLogout()
+    {
+        AuthService.Logout();
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+}

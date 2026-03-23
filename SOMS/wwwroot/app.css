@@ -1,0 +1,353 @@
+:root {
+    color-scheme: light;
+    --soms-primary: #3B5BDB;
+    --soms-border: #E2E8F0;
+    --soms-hover: #F1F5F9;
+    --soms-surface: #F8F9FA;
+    --soms-sidebar: #1E293B;
+    --soms-sidebar-hover: #334155;
+    --soms-sidebar-text: #F1F5F9;
+    --soms-sidebar-muted: #94A3B8;
+    --soms-text: #0F172A;
+    --soms-text-muted: #64748B;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--soms-text);
+    background: #FFFFFF;
+}
+
+body {
+    overflow: hidden;
+}
+
+a {
+    color: inherit;
+}
+
+.status-bar-safe-area {
+    display: none;
+}
+
+.mud-paper,
+.mud-card,
+.mud-dialog {
+    border: 1px solid var(--soms-border);
+    box-shadow: none !important;
+}
+
+.mud-button-root {
+    text-transform: none;
+    font-weight: 600;
+    border-radius: 4px !important;
+}
+
+.mud-input-control .mud-input-outlined-border,
+.mud-input-control .mud-input-root {
+    border-radius: 4px !important;
+}
+
+.mud-table-container .mud-table-row:hover {
+    background: var(--soms-hover);
+}
+
+.mud-table-row:hover {
+    background-color: #F1F5F9 !important;
+}
+
+.mud-table-cell {
+    border-bottom: 1px solid #E2E8F0 !important;
+}
+
+.mud-table-striped .mud-table-row:nth-child(odd) {
+    background: transparent;
+}
+
+.soms-topbar {
+    border-bottom: 1px solid var(--soms-border);
+}
+
+.soms-topbar-content {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.soms-topbar-title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.soms-main-content {
+    background: #FFFFFF;
+}
+
+.soms-content-frame {
+    min-height: calc(100vh - 56px);
+    padding: 24px;
+    background: #FFFFFF;
+}
+
+.soms-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 16px 12px;
+    background: var(--soms-sidebar);
+}
+
+.soms-sidebar-brand {
+    padding: 8px 12px 18px;
+    color: var(--soms-sidebar-text);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.08);
+    margin-bottom: 12px;
+}
+
+.soms-sidebar-menu {
+    gap: 6px;
+}
+
+.soms-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 2px 0;
+    padding: 10px 12px;
+    color: var(--soms-sidebar-muted) !important;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.soms-sidebar-link:hover {
+    background: var(--soms-sidebar-hover);
+    color: var(--soms-sidebar-text) !important;
+}
+
+.mud-nav-link.active {
+    background-color: #3B5BDB !important;
+    color: #FFFFFF !important;
+    border-radius: 4px !important;
+}
+
+.mud-nav-link.active .mud-nav-link-text {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+}
+
+.mud-nav-link.active .mud-icon-root {
+    color: #FFFFFF !important;
+}
+
+.soms-sidebar-link .mud-nav-link-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.auth-shell,
+.auth-page {
+    min-height: 100vh;
+    background: #FFFFFF;
+}
+
+.auth-main {
+    min-height: 100vh;
+}
+
+.login-card {
+    max-width: 400px;
+    margin: 0 auto;
+    border-radius: 4px !important;
+}
+
+.page-surface {
+    padding: 24px;
+    border-radius: 4px !important;
+    background: var(--soms-surface);
+}
+
+.page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 20px;
+}
+
+.members-page-header,
+.member-detail-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.members-header-actions {
+    align-items: center;
+}
+
+.members-filter-bar,
+.members-table-shell {
+    padding: 12px;
+    border-radius: 4px !important;
+    background: #FFFFFF;
+}
+
+.members-table-shell {
+    padding: 0;
+    overflow: hidden;
+}
+
+.member-committee-row {
+    background: #FFFFFF;
+}
+
+.member-import-input {
+    padding: 12px;
+    border: 1px dashed var(--soms-border);
+    border-radius: 4px;
+    background: var(--soms-surface);
+}
+
+.member-detail-heading {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+.member-detail-tabs .mud-tabs-panels {
+    padding-top: 16px;
+}
+
+.member-detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--soms-border);
+}
+
+.member-detail-field:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.member-actions-cell {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.engagement-summary-bar {
+    flex-wrap: wrap;
+}
+
+.engagement-score-cell {
+    min-width: 140px;
+}
+
+.engagement-progress {
+    min-width: 120px;
+}
+
+.engagement-breakdown-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.interaction-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.interaction-timeline-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.interaction-timeline-marker {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    min-height: 100%;
+}
+
+.interaction-timeline-marker::after {
+    content: "";
+    position: absolute;
+    top: 36px;
+    bottom: -16px;
+    width: 2px;
+    background: var(--soms-border);
+}
+
+.interaction-timeline-item:last-child .interaction-timeline-marker::after {
+    display: none;
+}
+
+.interaction-timeline-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #FFFFFF;
+    border: 1px solid var(--soms-border);
+    z-index: 1;
+}
+
+.interaction-timeline-card {
+    background: #FFFFFF;
+}
+
+.empty-state,
+.timeline-stub,
+.kpi-card {
+    border-radius: 4px !important;
+}
+
+#blazor-error-ui {
+    background: #fee2e2;
+    border-top: 1px solid #fecaca;
+    bottom: 0;
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.75rem 1rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: 0.75rem;
+}
+
+@media (max-width: 960px) {
+    .soms-content-frame {
+        padding: 16px;
+    }
+
+    .members-header-actions {
+        width: 100%;
+    }
+}

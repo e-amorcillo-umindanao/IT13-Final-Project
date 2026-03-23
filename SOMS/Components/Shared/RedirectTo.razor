@@ -1,0 +1,14 @@
+@inject NavigationManager NavManager
+
+@code {
+    [Parameter, EditorRequired]
+    public string Route { get; set; } = "/";
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            NavManager.NavigateTo(Route);
+        }
+    }
+}

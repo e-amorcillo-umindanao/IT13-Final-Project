@@ -1,0 +1,20 @@
+<MudChip T="string" Color="@ChipColor" Variant="Variant.Filled">
+    @Label
+</MudChip>
+
+@code {
+    [Parameter]
+    public int Score { get; set; }
+
+    private Color ChipColor => Score >= 75
+        ? Color.Success
+        : Score >= 40
+            ? Color.Warning
+            : Color.Error;
+
+    private string Label => Score >= 75
+        ? "High"
+        : Score >= 40
+            ? "Medium"
+            : "Low";
+}
