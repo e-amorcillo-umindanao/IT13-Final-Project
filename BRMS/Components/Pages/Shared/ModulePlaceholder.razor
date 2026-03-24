@@ -1,0 +1,44 @@
+@page "/residents"
+@page "/households"
+@page "/engagement"
+@page "/events"
+@page "/blotter"
+@page "/clearance"
+@page "/documents"
+@page "/reports"
+@page "/settings"
+@inject NavigationManager NavigationManager
+
+<PageTitle>@CurrentTitle</PageTitle>
+
+<div class="page-shell">
+    <h1 class="page-title">@CurrentTitle</h1>
+
+    <MudPaper Class="page-card" Elevation="0">
+        <MudText Typo="Typo.body1">@CurrentTitle module wiring will be added in a later phase.</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">The navigation shell is active now so the Phase 1 experience remains complete after login.</MudText>
+    </MudPaper>
+</div>
+
+@code {
+    private string CurrentTitle
+    {
+        get
+        {
+            var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Trim('/');
+            return relativePath.ToLowerInvariant() switch
+            {
+                "residents" => "Residents",
+                "households" => "Households",
+                "engagement" => "Engagement",
+                "events" => "Events",
+                "blotter" => "Blotter",
+                "clearance" => "Clearance",
+                "documents" => "Documents",
+                "reports" => "Reports",
+                "settings" => "Settings",
+                _ => "Module"
+            };
+        }
+    }
+}

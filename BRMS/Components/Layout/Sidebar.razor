@@ -1,0 +1,108 @@
+@inject AuthService AuthService
+@implements IDisposable
+
+<div class="sidebar-shell">
+    <div class="sidebar-brand">BRMS</div>
+
+    <nav class="sidebar-nav">
+        @foreach (var item in VisibleItems)
+        {
+            <NavLink href="@item.Href" Match="@item.Match" class="sidebar-link">
+                <MudIcon Icon="@item.Icon" Size="Size.Medium" />
+                <span>@item.Label</span>
+            </NavLink>
+        }
+    </nav>
+</div>
+
+@code {
+    private readonly IReadOnlyList<NavItem> _navItems =
+    [
+        new("Dashboard", "/dashboard", Icons.Material.Filled.SpaceDashboard, NavLinkMatch.All),
+        new("Residents", "/residents", Icons.Material.Filled.PeopleAlt, NavLinkMatch.Prefix),
+        new("Households", "/households", Icons.Material.Filled.HomeWork, NavLinkMatch.Prefix),
+        new("Engagement", "/engagement", Icons.Material.Filled.Handshake, NavLinkMatch.Prefix),
+        new("Events", "/events", Icons.Material.Filled.Event, NavLinkMatch.Prefix),
+        new("Blotter", "/blotter", Icons.Material.Filled.Gavel, NavLinkMatch.Prefix),
+        new("Clearance", "/clearance", Icons.Material.Filled.VerifiedUser, NavLinkMatch.Prefix),
+        new("Documents", "/documents", Icons.Material.Filled.Description, NavLinkMatch.Prefix),
+        new("Reports", "/reports", Icons.Material.Filled.BarChart, NavLinkMatch.Prefix),
+        new("Settings", "/settings", Icons.Material.Filled.Settings, NavLinkMatch.Prefix, true)
+    ];
+
+    private IEnumerable<NavItem> VisibleItems =>
+        _navItems.Where(item => !item.CaptainOnly || string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        AuthService.AuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= HandleAuthStateChanged;
+    }
+
+    private sealed record NavItem(string Label, string Href, string Icon, NavLinkMatch Match, bool CaptainOnly = false);
+}
+
+<style>
+    .sidebar-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        height: 100%;
+        padding: 20px 16px;
+        background: #1E293B;
+    }
+
+    .sidebar-brand {
+        color: #FFFFFF;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 4px;
+        color: #94A3B8;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .sidebar-link .mud-icon-root {
+        color: #94A3B8 !important;
+    }
+
+    .sidebar-link:hover {
+        background: rgba(59, 91, 219, 0.16);
+        color: #FFFFFF;
+    }
+
+    .sidebar-link:hover .mud-icon-root,
+    .sidebar-link.active .mud-icon-root {
+        color: #FFFFFF !important;
+    }
+
+    .sidebar-link.active {
+        background: #3B5BDB;
+        color: #FFFFFF;
+    }
+</style>

@@ -3,6 +3,13 @@ obj/
 .vs/
 .dotnet/
 .dotnet-home/
+.nuget/
+BRMS/.nuget/
+BRMS/brms.db
+BRMS/bin/
+BRMS/obj/
+BRMS/obj-codex/
+BRMS/obj_codex/
 *.user
 *.suo
 *.cache

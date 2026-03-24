@@ -1,0 +1,88 @@
+:root {
+    --mud-default-borderradius: 4px;
+    --brms-primary: #3B5BDB;
+    --brms-sidebar: #1E293B;
+    --brms-background: #F8F9FA;
+    --brms-surface: #FFFFFF;
+    --brms-border: #E2E8F0;
+    --brms-text: #0F172A;
+    --brms-muted: #64748B;
+    --brms-sidebar-text: #94A3B8;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--brms-background);
+    color: var(--brms-text);
+    font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    min-height: 100vh;
+}
+
+#app {
+    min-height: 100vh;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.mud-paper,
+.mud-card,
+.mud-appbar,
+.mud-drawer {
+    box-shadow: none !important;
+}
+
+.mud-card {
+    border: 1px solid var(--brms-border) !important;
+    border-radius: 4px !important;
+    background: var(--brms-surface) !important;
+}
+
+.mud-paper.page-card {
+    border: 1px solid var(--brms-border);
+    border-radius: 4px;
+    background: var(--brms-surface);
+}
+
+.mud-input-control .mud-input-outlined-border {
+    border-radius: 4px !important;
+}
+
+.mud-button-root {
+    text-transform: none !important;
+}
+
+.mud-table-root table tbody tr {
+    background: var(--brms-surface);
+}
+
+.mud-table-root table tbody tr:nth-child(even) {
+    background: var(--brms-surface) !important;
+}
+
+.page-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--brms-text);
+}
+
+.page-card {
+    padding: 24px;
+}
+
+#blazor-error-ui {
+    display: none;
+}

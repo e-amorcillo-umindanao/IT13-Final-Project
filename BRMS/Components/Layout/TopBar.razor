@@ -1,0 +1,100 @@
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="topbar-shell">
+    <div class="topbar-brand">BRMS</div>
+    <div class="topbar-title">Barangay Catalunan Pequeño</div>
+    <div class="topbar-user">
+        <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <ActivatorContent>
+                <button type="button" class="topbar-user-button">
+                    <span>@CurrentUsername</span>
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" />
+                </button>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem OnClick="@HandleLogoutAsync">Logout</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </div>
+</div>
+
+@code {
+    private string CurrentUsername => AuthService.CurrentUser?.Username ?? "Guest";
+
+    protected override void OnInitialized()
+    {
+        AuthService.AuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleLogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/login", false);
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= HandleAuthStateChanged;
+    }
+}
+
+<style>
+    .topbar-shell {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        height: 100%;
+        padding: 0 20px;
+        gap: 16px;
+        background: #FFFFFF;
+    }
+
+    .topbar-brand {
+        justify-self: start;
+        font-size: 18px;
+        font-weight: 700;
+        color: #0F172A;
+    }
+
+    .topbar-title {
+        justify-self: center;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+        white-space: nowrap;
+    }
+
+    .topbar-user {
+        justify-self: end;
+    }
+
+    .topbar-user-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 10px;
+        border: 1px solid #E2E8F0;
+        border-radius: 4px;
+        background: #FFFFFF;
+        color: #0F172A;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    @@media (max-width: 900px) {
+        .topbar-shell {
+            grid-template-columns: 1fr auto;
+        }
+
+        .topbar-title {
+            display: none;
+        }
+    }
+</style>

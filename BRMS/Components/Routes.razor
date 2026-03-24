@@ -1,0 +1,70 @@
+@using BRMS.Components.Pages.Auth
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+@implements IDisposable
+
+<Router AppAssembly="@typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@ResolveLayout(routeData)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@(AuthService.IsAuthenticated ? typeof(MainLayout) : typeof(AuthLayout))">
+            <div class="page-shell">
+                <h1 class="page-title">Page Not Found</h1>
+                <MudPaper Class="page-card" Elevation="0">
+                    <MudText Typo="Typo.body1">The page you requested does not exist in this Phase 1 scaffold.</MudText>
+                </MudPaper>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        AuthService.AuthStateChanged += HandleAuthStateChanged;
+        GuardRoute();
+    }
+
+    private Type ResolveLayout(RouteData routeData)
+    {
+        return routeData.PageType == typeof(Login) ? typeof(AuthLayout) : typeof(MainLayout);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        GuardRoute();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        GuardRoute();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void GuardRoute()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Trim('/');
+        var isAuthPath = string.IsNullOrWhiteSpace(relativePath) || string.Equals(relativePath, "login", StringComparison.OrdinalIgnoreCase);
+
+        if (!isAuthPath && !AuthService.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login", false);
+            return;
+        }
+
+        if (isAuthPath && AuthService.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/dashboard", false);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+        AuthService.AuthStateChanged -= HandleAuthStateChanged;
+    }
+}

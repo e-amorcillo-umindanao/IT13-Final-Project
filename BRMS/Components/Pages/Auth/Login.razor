@@ -1,0 +1,165 @@
+@page "/"
+@page "/login"
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <MudText Typo="Typo.h4" Class="login-title">BRMS</MudText>
+            <MudText Typo="Typo.body2" Class="login-subtitle">Barangay Resident Management System</MudText>
+        </div>
+
+        <EditForm Model="_model" OnValidSubmit="HandleLoginAsync">
+            <DataAnnotationsValidator />
+
+            <div class="login-form">
+                <MudTextField @bind-Value="_model.Username"
+                              For="@(() => _model.Username)"
+                              Label="Username"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Immediate="true" />
+
+                <MudTextField @bind-Value="_model.Password"
+                              For="@(() => _model.Password)"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Immediate="true"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="TogglePasswordVisibility" />
+
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <div class="login-error">@_errorMessage</div>
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Disabled="@_isSubmitting"
+                           Class="login-button">
+                    LOGIN
+                </MudButton>
+            </div>
+        </EditForm>
+
+        <MudText Typo="Typo.caption" Class="login-footer">© Barangay Catalunan Pequeño</MudText>
+    </div>
+</div>
+
+@code {
+    private readonly LoginFormModel _model = new();
+    private bool _showPassword;
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (AuthService.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/dashboard", false);
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        var user = await AuthService.LoginAsync(_model.Username, _model.Password);
+        if (user is null)
+        {
+            _errorMessage = "Invalid username or password.";
+            _isSubmitting = false;
+            return;
+        }
+
+        _isSubmitting = false;
+        NavigationManager.NavigateTo("/dashboard", false);
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private sealed class LoginFormModel
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .login-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+        background: #F8F9FA;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 40px;
+        border: 1px solid #E2E8F0;
+        border-radius: 4px;
+        background: #FFFFFF;
+    }
+
+    .login-header {
+        margin-bottom: 24px;
+    }
+
+    .login-title {
+        margin-bottom: 4px;
+        font-weight: 700;
+        color: #0F172A;
+    }
+
+    .login-subtitle {
+        color: #64748B;
+    }
+
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .login-button {
+        height: 44px;
+        border-radius: 4px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .login-error {
+        color: #DC2626;
+        font-size: 13px;
+    }
+
+    .login-footer {
+        display: block;
+        margin-top: 24px;
+        text-align: center;
+        color: #94A3B8;
+    }
+</style>
