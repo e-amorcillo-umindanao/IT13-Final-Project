@@ -3,8 +3,8 @@
         <MudText Typo="Typo.body1">@Message</MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="@ConfirmColor" OnClick="Confirm">
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="@(ConfirmColor == Color.Error ? Variant.Outlined : Variant.Filled)" Color="@ConfirmColor" OnClick="Confirm">
             @ConfirmText
         </MudButton>
     </DialogActions>

@@ -1,14 +1,13 @@
-<MudPaper Class="kpi-card pa-4">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-        <MudStack Spacing="0">
+<MudCard Class="kpi-card dashboard-kpi-shell" Style="padding: 20px; height: 100%; border: 1px solid #E2E8F0; border-radius: 4px; box-shadow: none;">
+    <MudStack Spacing="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudIcon Icon="@Icon" Size="Size.Medium" Color="@Color" />
             <MudText Typo="Typo.caption" Color="Color.Secondary">@Title</MudText>
-            <MudText Typo="Typo.h6">@Value</MudText>
         </MudStack>
-        <MudAvatar Color="@Color" Variant="Variant.Filled">
-            <MudIcon Icon="@Icon" />
-        </MudAvatar>
+
+        <MudText Typo="Typo.h5" Style="font-weight: 700; color: #0F172A;">@Value</MudText>
     </MudStack>
-</MudPaper>
+</MudCard>
 
 @code {
     [Parameter]

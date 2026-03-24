@@ -31,18 +31,47 @@ public class AuditService
         await _db.SaveChangesAsync();
     }
 
-    public Task<List<AuditLog>> GetLogsAsync(int page = 1, int pageSize = 50)
+    public Task<List<AuditLog>> GetLogsAsync(string? search = null, int page = 1, int pageSize = 50)
     {
         page = Math.Max(1, page);
         pageSize = Math.Max(1, pageSize);
 
-        return _db.AuditLogs
+        var query = _db.AuditLogs
             .AsNoTracking()
             .Include(log => log.User)
             .ThenInclude(user => user.Role)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim().ToLowerInvariant();
+            query = query.Where(log =>
+                log.Action.ToLower().Contains(normalizedSearch) ||
+                log.User.Username.ToLower().Contains(normalizedSearch));
+        }
+
+        return query
             .OrderByDescending(log => log.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
+    }
+
+    public Task<int> GetLogCountAsync(string? search = null)
+    {
+        var query = _db.AuditLogs
+            .AsNoTracking()
+            .Include(log => log.User)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalizedSearch = search.Trim().ToLowerInvariant();
+            query = query.Where(log =>
+                log.Action.ToLower().Contains(normalizedSearch) ||
+                log.User.Username.ToLower().Contains(normalizedSearch));
+        }
+
+        return query.CountAsync();
     }
 }

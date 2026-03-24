@@ -4,6 +4,7 @@
 @inject AuthService AuthService
 @inject EngagementService EngagementService
 @inject InteractionService InteractionService
+@inject AttendanceService AttendanceService
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -22,16 +23,15 @@ else
 {
     <MudStack Spacing="3">
         <div class="member-detail-topbar">
-            <MudButton Variant="Variant.Text"
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
                        StartIcon="@Icons.Material.Filled.ArrowBack"
                        OnClick="GoBack">
                 Back
             </MudButton>
 
             <div class="member-detail-heading">
-                <MudText Typo="Typo.h5" Class="fw-bold" data-page-title="true">
-                    @_member.FirstName @_member.LastName
-                </MudText>
+                <PageHeader Title="@_member.FullName" Subtitle="@($"Student ID: {_member.StudentId}")" />
             </div>
 
             <MudButton Variant="Variant.Outlined"
@@ -46,7 +46,7 @@ else
             <MudTabPanel Text="Profile">
                 <MudGrid Spacing="3">
                     <MudItem xs="12" lg="7">
-                        <MudCard>
+                        <MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
                             <MudCardContent>
                                 <MudText Typo="Typo.subtitle1" Class="mb-4">Member Information</MudText>
 
@@ -91,7 +91,7 @@ else
                     </MudItem>
 
                     <MudItem xs="12" lg="5">
-                        <MudCard>
+                        <MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
                             <MudCardContent>
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
                                     <MudText Typo="Typo.subtitle1">Committee Assignments</MudText>
@@ -146,6 +146,7 @@ else
                                             <MudSelect T="int?"
                                                        Label="Committee"
                                                        Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense"
                                                        Value="_selectedCommitteeId"
                                                        ValueChanged="OnSelectedCommitteeChanged">
                                                 @foreach (var committee in _committees)
@@ -158,6 +159,7 @@ else
                                             <MudTextField T="string"
                                                           Label="Role"
                                                           Variant="Variant.Outlined"
+                                                          Margin="Margin.Dense"
                                                           Value="_selectedCommitteeRole"
                                                           ValueChanged="OnSelectedCommitteeRoleChanged" />
                                         </MudItem>
@@ -181,7 +183,7 @@ else
             <MudTabPanel Text="Engagement">
                 <MudGrid Spacing="3">
                     <MudItem xs="12" lg="4">
-                        <MudCard Class="h-100">
+                        <MudCard Class="h-100" Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
                             <MudCardContent>
                                 <MudStack Spacing="2">
                                     <MudText Typo="Typo.subtitle1">Engagement Score</MudText>
@@ -205,7 +207,7 @@ else
                     </MudItem>
 
                     <MudItem xs="12" lg="8">
-                        <MudCard Class="h-100">
+                        <MudCard Class="h-100" Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
                             <MudCardContent>
                                 <MudText Typo="Typo.subtitle1" Class="mb-4">Score Breakdown</MudText>
 
@@ -256,13 +258,63 @@ else
             </MudTabPanel>
 
             <MudTabPanel Text="Attendance">
-                <MudPaper Class="page-surface">
-                    <MudText Typo="Typo.body1">Attendance history will appear here</MudText>
-                </MudPaper>
+                <MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
+                    <MudCardContent>
+                        <MudStack Spacing="3">
+                            <MudTable T="Attendance"
+                                      Items="_attendanceHistory"
+                                      Hover="true"
+                                      Dense="true"
+                                      RowsPerPage="10"
+                                      Breakpoint="Breakpoint.Sm"
+                                      Elevation="0"
+                                      Style="border: 1px solid #E2E8F0; border-radius: 4px;">
+                                <HeaderContent>
+                                    <MudTh>Event Title</MudTh>
+                                    <MudTh>Date</MudTh>
+                                    <MudTh>Type</MudTh>
+                                    <MudTh>Status</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Event Title">@context.Event.Title</MudTd>
+                                    <MudTd DataLabel="Date">@context.Event.EventDate.ToString("MMM dd, yyyy")</MudTd>
+                                    <MudTd DataLabel="Type">
+                                        <MudChip T="string"
+                                                 Variant="Variant.Outlined"
+                                                 Size="Size.Small"
+                                                 Color="@GetEventTypeColor(context.Event.EventType)">
+                                            @context.Event.EventType
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip T="string"
+                                                 Variant="Variant.Filled"
+                                                 Size="Size.Small"
+                                                 Color="@GetAttendanceStatusColor(context.Status)">
+                                            @context.Status
+                                        </MudChip>
+                                    </MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>
+                                    <div class="pa-4">
+                                        <EmptyState Message="No attendance records yet." Icon="@Icons.Material.Filled.EventBusy" />
+                                    </div>
+                                </NoRecordsContent>
+                                <PagerContent>
+                                    <MudTablePager PageSizeOptions="_attendancePageSizeOptions" />
+                                </PagerContent>
+                            </MudTable>
+
+                            <MudText Typo="Typo.subtitle2">
+                                Attendance Rate: @_attendanceRate.ToString("P0")
+                            </MudText>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
             </MudTabPanel>
 
             <MudTabPanel Text="Interactions">
-                <MudCard>
+                <MudCard Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
                     <MudCardContent>
                         <MudStack Spacing="3">
                             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
@@ -291,11 +343,14 @@ else
     private Member? _member;
     private EngagementBreakdown? _engagementBreakdown;
     private List<InteractionLog> _interactionLogs = [];
+    private List<Attendance> _attendanceHistory = [];
     private List<Committee> _committees = [];
+    private readonly int[] _attendancePageSizeOptions = [5, 10, 20];
     private int? _selectedCommitteeId;
     private string? _selectedCommitteeRole;
     private bool _showCommitteeForm;
     private bool _isLoading = true;
+    private double _attendanceRate;
 
     private bool CanManageCommittees => AuthService.CurrentRole is "Admin" or "Officer";
 
@@ -383,13 +438,17 @@ else
         var committeesTask = MemberService.GetCommitteesAsync();
         var engagementTask = EngagementService.GetMemberEngagementAsync(Id);
         var interactionsTask = InteractionService.GetByMemberAsync(Id);
+        var attendanceTask = AttendanceService.GetMemberAttendanceAsync(Id);
+        var attendanceRateTask = AttendanceService.GetAttendanceRateAsync(Id);
 
-        await Task.WhenAll(memberTask, committeesTask, engagementTask, interactionsTask);
+        await Task.WhenAll(memberTask, committeesTask, engagementTask, interactionsTask, attendanceTask, attendanceRateTask);
 
         _member = await memberTask;
         _committees = await committeesTask;
         _engagementBreakdown = await engagementTask;
         _interactionLogs = await interactionsTask;
+        _attendanceHistory = await attendanceTask;
+        _attendanceRate = await attendanceRateTask;
     }
 
     private async Task ReloadEngagementDataAsync()
@@ -455,6 +514,23 @@ else
             "High" => Color.Success,
             "Medium" => Color.Warning,
             "Low" => Color.Error,
+            _ => Color.Default
+        };
+
+    private static Color GetAttendanceStatusColor(string status)
+        => status switch
+        {
+            "Present" => Color.Success,
+            "Excused" => Color.Warning,
+            _ => Color.Error
+        };
+
+    private static Color GetEventTypeColor(string eventType)
+        => eventType switch
+        {
+            "General Assembly" => Color.Primary,
+            "Seminar" => Color.Info,
+            "Activity" => Color.Success,
             _ => Color.Default
         };
 }

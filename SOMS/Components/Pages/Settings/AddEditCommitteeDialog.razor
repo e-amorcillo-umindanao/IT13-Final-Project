@@ -1,0 +1,138 @@
+@using System.ComponentModel.DataAnnotations
+@inject SettingsService SettingsService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else
+        {
+            <MudForm @ref="_form" Model="_model">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Label="Name*"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      For="@(() => _model.Name)"
+                                      @bind-Value="_model.Name"
+                                      Required="true"
+                                      RequiredError="Committee name is required." />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Label="Description"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Lines="3"
+                                      @bind-Value="_model.Description" />
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Cancel" Disabled="_isSaving">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isSaving || _isLoading">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                <span>Saving...</span>
+            }
+            else
+            {
+                <span>Save</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int? CommitteeId { get; set; }
+
+    private MudForm? _form;
+    private CommitteeEditorModel _model = new();
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CommitteeId.HasValue)
+        {
+            var committee = await SettingsService.GetCommitteeByIdAsync(CommitteeId.Value);
+            if (committee is null)
+            {
+                Snackbar.Add("Committee not found.", Severity.Error);
+                MudDialog.Cancel();
+                return;
+            }
+
+            _model = new CommitteeEditorModel
+            {
+                Name = committee.Name,
+                Description = committee.Description
+            };
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_isSaving || _form is null)
+        {
+            return;
+        }
+
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            if (CommitteeId.HasValue)
+            {
+                await SettingsService.UpdateCommitteeAsync(CommitteeId.Value, _model.Name, _model.Description);
+                Snackbar.Add("Committee updated.", Severity.Success);
+            }
+            else
+            {
+                await SettingsService.CreateCommitteeAsync(_model.Name, _model.Description);
+                Snackbar.Add("Committee created.", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (InvalidOperationException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private sealed class CommitteeEditorModel
+    {
+        [Required(ErrorMessage = "Committee name is required.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+    }
+}

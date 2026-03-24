@@ -20,6 +20,7 @@
                             <MudAutocomplete T="MemberLookupItem"
                                              Label="Member"
                                              Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
                                              Value="_selectedMember"
                                              ValueChanged="OnSelectedMemberChangedAsync"
                                              SearchFunc="SearchMembersAsync"
@@ -34,6 +35,7 @@
                         <MudSelect T="string"
                                    Label="Interaction Type"
                                    Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
                                    @bind-Value="_model.InteractionType">
                             @foreach (var interactionType in InteractionTypes)
                             {
@@ -45,6 +47,7 @@
                     <MudItem xs="12">
                         <MudDatePicker Label="Date"
                                        Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
                                        Date="_model.InteractionDate"
                                        DateChanged="OnInteractionDateChanged" />
                     </MudItem>
@@ -53,6 +56,7 @@
                         <MudTextField T="string"
                                       Label="Notes"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       Lines="4"
                                       For="@(() => _model.Notes)"
                                       @bind-Value="_model.Notes"
@@ -64,7 +68,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isSaving || _isLoading">
             @if (_isSaving)
             {

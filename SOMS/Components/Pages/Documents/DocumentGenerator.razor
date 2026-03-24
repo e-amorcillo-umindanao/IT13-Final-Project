@@ -1,5 +1,590 @@
 @page "/documents"
+@layout MainLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.Maui.ApplicationModel
+@inject DocumentService DocumentService
+@inject MemberService MemberService
+@inject EventService EventService
+@inject ISnackbar Snackbar
 
-<MudPaper Class="page-surface">
-    <MudText Typo="Typo.h6" data-page-title="true">Documents</MudText>
-</MudPaper>
+<PageTitle>Documents</PageTitle>
+
+<MudStack Spacing="3">
+    <PageHeader Title="Documents" Subtitle="Generate certificates and official letters" />
+
+    @if (_isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="4">
+                <MudCard Class="documents-card" Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" Class="mb-3">Select Document Type</MudText>
+                        <MudRadioGroup T="DocumentType"
+                                       Value="_selectedDocumentType"
+                                       ValueChanged="OnDocumentTypeChangedAsync">
+                            <MudRadio T="DocumentType" Value="DocumentType.MembershipCertificate">Certificate of Membership</MudRadio>
+                            <MudRadio T="DocumentType" Value="DocumentType.ParticipationCertificate">Certificate of Participation</MudRadio>
+                            <MudRadio T="DocumentType" Value="DocumentType.OfficialLetter">Official Letter</MudRadio>
+                        </MudRadioGroup>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <MudCard Class="documents-card" Elevation="0" Style="border: 1px solid #E2E8F0; border-radius: 4px;">
+                    <MudCardContent>
+                        <MudForm @ref="_form" Model="CurrentFormModel">
+                            @if (_selectedDocumentType == DocumentType.MembershipCertificate)
+                            {
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12">
+                                        <MudAutocomplete T="Member"
+                                                         Label="Member*"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Value="_membershipModel.Member"
+                                                         ValueChanged="OnMembershipMemberChangedAsync"
+                                                         SearchFunc="SearchMembersAsync"
+                                                         ToStringFunc="@(member => member?.FullName ?? string.Empty)"
+                                                         For="@(() => _membershipModel.Member)"
+                                                         Clearable="true"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false" />
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Additional Notes"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Lines="3"
+                                                      @bind-Value="_membershipModel.AdditionalNotes" />
+                                    </MudItem>
+                                </MudGrid>
+                            }
+                            else if (_selectedDocumentType == DocumentType.ParticipationCertificate)
+                            {
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12">
+                                        <MudAutocomplete T="Member"
+                                                         Label="Member*"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Value="_participationModel.Member"
+                                                         ValueChanged="OnParticipationMemberChangedAsync"
+                                                         SearchFunc="SearchMembersAsync"
+                                                         ToStringFunc="@(member => member?.FullName ?? string.Empty)"
+                                                         For="@(() => _participationModel.Member)"
+                                                         Clearable="true"
+                                                         ResetValueOnEmptyText="true"
+                                                         CoerceText="false" />
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudSelect T="int?"
+                                                   Label="Event*"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Value="_participationModel.EventId"
+                                                   ValueChanged="OnParticipationEventChangedAsync"
+                                                   For="@(() => _participationModel.EventId)">
+                                            @foreach (var eventItem in _events)
+                                            {
+                                                <MudSelectItem T="int?" Value="@((int?)eventItem.EventId)">
+                                                    @eventItem.Title (@eventItem.EventDate.ToString("MMMM dd, yyyy"))
+                                                </MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Additional Notes"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Lines="3"
+                                                      @bind-Value="_participationModel.AdditionalNotes" />
+                                    </MudItem>
+                                </MudGrid>
+                            }
+                            else
+                            {
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Recipient Name*"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      For="@(() => _letterModel.RecipientName)"
+                                                      @bind-Value="_letterModel.RecipientName"
+                                                      Required="true"
+                                                      RequiredError="Recipient name is required." />
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Letter Body*"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      For="@(() => _letterModel.Body)"
+                                                      @bind-Value="_letterModel.Body"
+                                                      Lines="8"
+                                                      Required="true"
+                                                      RequiredError="Letter body is required." />
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudTextField T="string"
+                                                      Label="Additional Notes"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Lines="3"
+                                                      @bind-Value="_letterModel.AdditionalNotes" />
+                                    </MudItem>
+                                    <MudItem xs="12">
+                                        <MudStack Row="true" Spacing="1" Class="documents-chip-row">
+                                            <MudChip T="string" Variant="Variant.Outlined">Org: @_orgSettings.OrgName</MudChip>
+                                            <MudChip T="string" Variant="Variant.Outlined">AY: @_orgSettings.AcademicYear</MudChip>
+                                            <MudChip T="string" Variant="Variant.Outlined">President: @DisplayOrFallback(_orgSettings.PresidentName, "Not set")</MudChip>
+                                            <MudChip T="string" Variant="Variant.Outlined">Adviser: @DisplayOrFallback(_orgSettings.AdviserName, "Not set")</MudChip>
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                            }
+                        </MudForm>
+
+                        <MudStack Row="true" Spacing="2" Class="mt-4 documents-action-row">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       OnClick="PreviewAsync"
+                                       Disabled="_isProcessing">
+                                Preview PDF
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="DownloadAsync"
+                                       Disabled="_isProcessing">
+                                @if (_isProcessing)
+                                {
+                                    <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                                    <span>Generating...</span>
+                                }
+                                else
+                                {
+                                    <span>Download PDF</span>
+                                }
+                            </MudButton>
+                        </MudStack>
+
+                        <MudPaper Class="documents-preview mt-4" Elevation="0">
+                            @if (_preview is null)
+                            {
+                                <div class="documents-preview-empty">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Click Preview PDF to render a document preview here.
+                                    </MudText>
+                                </div>
+                            }
+                            else if (_preview.Type == DocumentType.OfficialLetter)
+                            {
+                                <div class="letter-preview">
+                                    <div class="letter-preview-top">
+                                        <div>
+                                            <div class="letter-preview-org">@_preview.OrgName</div>
+                                            <div class="letter-preview-meta">Academic Year @_preview.AcademicYear</div>
+                                        </div>
+                                        <div class="letter-preview-date">@_preview.IssuedDate</div>
+                                    </div>
+                                    <div class="letter-preview-recipient">To: @_preview.RecipientName</div>
+                                    <div class="letter-preview-rule"></div>
+                                    <p class="letter-preview-body">@_preview.Body</p>
+                                    @if (!string.IsNullOrWhiteSpace(_preview.AdditionalNotes))
+                                    {
+                                        <p class="letter-preview-notes">Additional Notes: @_preview.AdditionalNotes</p>
+                                    }
+                                    <div class="letter-preview-signature">
+                                        <div class="signature-line"></div>
+                                        <div>@DisplayOrFallback(_preview.PresidentName, "Organization President")</div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="certificate-preview">
+                                    @if (_preview.HasLogo)
+                                    {
+                                        <div class="certificate-preview-logo">Logo</div>
+                                    }
+                                    <div class="certificate-preview-org">@_preview.OrgName</div>
+                                    <div class="certificate-preview-title">@_preview.Title</div>
+                                    <div class="certificate-preview-caption">This certifies that</div>
+                                    <div class="certificate-preview-name">@_preview.MemberName</div>
+                                    @foreach (var line in _preview.BodyLines)
+                                    {
+                                        <div class="certificate-preview-line">@line</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(_preview.AdditionalNotes))
+                                    {
+                                        <div class="certificate-preview-notes">@_preview.AdditionalNotes</div>
+                                    }
+                                    <div class="certificate-preview-signatures">
+                                        <div class="certificate-signature-block">
+                                            <div class="signature-line"></div>
+                                            <div>@DisplayOrFallback(_preview.AdviserName, "Faculty Adviser")</div>
+                                            <div class="signature-role">Faculty Adviser</div>
+                                        </div>
+                                        <div class="certificate-signature-block">
+                                            <div class="signature-line"></div>
+                                            <div>@DisplayOrFallback(_preview.PresidentName, "Organization President")</div>
+                                            <div class="signature-role">Organization President</div>
+                                        </div>
+                                    </div>
+                                    <div class="certificate-preview-issued">Issued: @_preview.IssuedDate</div>
+                                </div>
+                            }
+                        </MudPaper>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    private MudForm? _form;
+    private readonly MembershipDocumentModel _membershipModel = new();
+    private readonly ParticipationDocumentModel _participationModel = new();
+    private readonly LetterDocumentModel _letterModel = new();
+    private List<Member> _members = [];
+    private List<Event> _events = [];
+    private OrgSetting _orgSettings = new();
+    private DocumentPreviewModel? _preview;
+    private DocumentType _selectedDocumentType = DocumentType.MembershipCertificate;
+    private bool _isLoading = true;
+    private bool _isProcessing;
+
+    private object CurrentFormModel
+        => _selectedDocumentType switch
+        {
+            DocumentType.MembershipCertificate => _membershipModel,
+            DocumentType.ParticipationCertificate => _participationModel,
+            _ => _letterModel
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var membersTask = MemberService.GetAllAsync(null, null, null, null);
+        var eventsTask = EventService.GetAllAsync();
+        var orgSettingsTask = DocumentService.GetOrgSettingsAsync();
+
+        await Task.WhenAll(membersTask, eventsTask, orgSettingsTask);
+
+        _members = await membersTask;
+        _events = await eventsTask;
+        _orgSettings = await orgSettingsTask;
+        _isLoading = false;
+    }
+
+    private Task<IEnumerable<Member>> SearchMembersAsync(string value, CancellationToken token)
+    {
+        IEnumerable<Member> results = _members;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            var normalizedValue = value.Trim();
+            results = results.Where(member =>
+                member.FullName.Contains(normalizedValue, StringComparison.OrdinalIgnoreCase) ||
+                member.StudentId.Contains(normalizedValue, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(results);
+    }
+
+    private Task OnDocumentTypeChangedAsync(DocumentType value)
+    {
+        _selectedDocumentType = value;
+        _preview = null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnMembershipMemberChangedAsync(Member? value)
+    {
+        _membershipModel.Member = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnParticipationMemberChangedAsync(Member? value)
+    {
+        _participationModel.Member = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnParticipationEventChangedAsync(int? value)
+    {
+        _participationModel.EventId = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (!await ValidateCurrentFormAsync())
+        {
+            return;
+        }
+
+        _preview = BuildPreview();
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (_isProcessing || !await ValidateCurrentFormAsync())
+        {
+            return;
+        }
+
+        _isProcessing = true;
+
+        try
+        {
+            _preview = BuildPreview();
+
+            byte[] pdf;
+            string fileName;
+
+            if (_selectedDocumentType == DocumentType.MembershipCertificate)
+            {
+                pdf = await DocumentService.GenerateCertificateOfMembershipAsync(
+                    _membershipModel.Member!.MemberId,
+                    NormalizeOptional(_membershipModel.AdditionalNotes));
+                fileName = BuildSafeFileName($"membership-certificate-{_membershipModel.Member.FullName}.pdf");
+            }
+            else if (_selectedDocumentType == DocumentType.ParticipationCertificate)
+            {
+                var selectedEvent = GetSelectedEvent()!;
+                pdf = await DocumentService.GenerateCertificateOfParticipationAsync(
+                    _participationModel.Member!.MemberId,
+                    selectedEvent.EventId,
+                    NormalizeOptional(_participationModel.AdditionalNotes));
+                fileName = BuildSafeFileName($"participation-certificate-{_participationModel.Member.FullName}-{selectedEvent.Title}.pdf");
+            }
+            else
+            {
+                pdf = await DocumentService.GenerateOfficialLetterAsync(
+                    _letterModel.RecipientName,
+                    _letterModel.Body,
+                    NormalizeOptional(_letterModel.AdditionalNotes));
+                fileName = BuildSafeFileName($"official-letter-{_letterModel.RecipientName}.pdf");
+            }
+
+            var path = await DocumentService.SavePdfToFileAsync(pdf, fileName);
+            await Launcher.Default.OpenAsync(new OpenFileRequest
+            {
+                File = new ReadOnlyFile(path)
+            });
+
+            Snackbar.Add($"PDF saved to {path}", Severity.Success);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add($"Unable to generate the document: {exception.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task<bool> ValidateCurrentFormAsync()
+    {
+        if (_form is not null)
+        {
+            await _form.ValidateAsync();
+            if (!_form.IsValid)
+            {
+                return false;
+            }
+        }
+
+        if (_selectedDocumentType == DocumentType.MembershipCertificate)
+        {
+            if (_membershipModel.Member is null)
+            {
+                Snackbar.Add("Select a member first.", Severity.Warning);
+                return false;
+            }
+        }
+        else if (_selectedDocumentType == DocumentType.ParticipationCertificate)
+        {
+            if (_participationModel.Member is null)
+            {
+                Snackbar.Add("Select a member first.", Severity.Warning);
+                return false;
+            }
+
+            if (!_participationModel.EventId.HasValue || GetSelectedEvent() is null)
+            {
+                Snackbar.Add("Select an event first.", Severity.Warning);
+                return false;
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(_letterModel.RecipientName))
+            {
+                Snackbar.Add("Recipient name is required.", Severity.Warning);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(_letterModel.Body))
+            {
+                Snackbar.Add("Letter body is required.", Severity.Warning);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private DocumentPreviewModel BuildPreview()
+    {
+        var issuedDate = DateTime.Now.ToString("MMMM dd, yyyy");
+
+        if (_selectedDocumentType == DocumentType.MembershipCertificate)
+        {
+            return new DocumentPreviewModel
+            {
+                Type = DocumentType.MembershipCertificate,
+                Title = "CERTIFICATE OF MEMBERSHIP",
+                OrgName = _orgSettings.OrgName,
+                AcademicYear = _orgSettings.AcademicYear,
+                MemberName = _membershipModel.Member!.FullName,
+                AdviserName = _orgSettings.AdviserName,
+                PresidentName = _orgSettings.PresidentName,
+                AdditionalNotes = NormalizeOptional(_membershipModel.AdditionalNotes),
+                IssuedDate = issuedDate,
+                HasLogo = !string.IsNullOrWhiteSpace(_orgSettings.LogoPath),
+                BodyLines =
+                [
+                    $"is a recognized {_membershipModel.Member.RecruitmentStage} member of {_orgSettings.OrgName}",
+                    $"Academic Year: {_orgSettings.AcademicYear} | {_orgSettings.SemesterLabel}"
+                ]
+            };
+        }
+
+        if (_selectedDocumentType == DocumentType.ParticipationCertificate)
+        {
+            var selectedEvent = GetSelectedEvent()!;
+            var venueSegment = string.IsNullOrWhiteSpace(selectedEvent.Venue)
+                ? string.Empty
+                : $" at {selectedEvent.Venue}";
+
+            return new DocumentPreviewModel
+            {
+                Type = DocumentType.ParticipationCertificate,
+                Title = "CERTIFICATE OF PARTICIPATION",
+                OrgName = _orgSettings.OrgName,
+                AcademicYear = _orgSettings.AcademicYear,
+                MemberName = _participationModel.Member!.FullName,
+                AdviserName = _orgSettings.AdviserName,
+                PresidentName = _orgSettings.PresidentName,
+                AdditionalNotes = NormalizeOptional(_participationModel.AdditionalNotes),
+                IssuedDate = issuedDate,
+                HasLogo = !string.IsNullOrWhiteSpace(_orgSettings.LogoPath),
+                BodyLines =
+                [
+                    $"participated in {selectedEvent.Title}",
+                    $"held on {selectedEvent.EventDate:MMMM dd, yyyy}{venueSegment}"
+                ]
+            };
+        }
+
+        return new DocumentPreviewModel
+        {
+            Type = DocumentType.OfficialLetter,
+            Title = "OFFICIAL LETTER",
+            OrgName = _orgSettings.OrgName,
+            AcademicYear = _orgSettings.AcademicYear,
+            RecipientName = _letterModel.RecipientName.Trim(),
+            Body = _letterModel.Body.Trim(),
+            AdviserName = _orgSettings.AdviserName,
+            PresidentName = _orgSettings.PresidentName,
+            AdditionalNotes = NormalizeOptional(_letterModel.AdditionalNotes),
+            IssuedDate = issuedDate,
+            HasLogo = !string.IsNullOrWhiteSpace(_orgSettings.LogoPath)
+        };
+    }
+
+    private Event? GetSelectedEvent()
+        => _participationModel.EventId.HasValue
+            ? _events.FirstOrDefault(item => item.EventId == _participationModel.EventId.Value)
+            : null;
+
+    private static string DisplayOrFallback(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string BuildSafeFileName(string fileName)
+    {
+        var invalidCharacters = Path.GetInvalidFileNameChars();
+        var sanitized = new string(fileName.Select(character => invalidCharacters.Contains(character) ? '-' : character).ToArray());
+        return sanitized.Replace("  ", " ");
+    }
+
+    private enum DocumentType
+    {
+        MembershipCertificate,
+        ParticipationCertificate,
+        OfficialLetter
+    }
+
+    private sealed class MembershipDocumentModel
+    {
+        [Required(ErrorMessage = "Member is required.")]
+        public Member? Member { get; set; }
+
+        public string? AdditionalNotes { get; set; }
+    }
+
+    private sealed class ParticipationDocumentModel
+    {
+        [Required(ErrorMessage = "Member is required.")]
+        public Member? Member { get; set; }
+
+        [Required(ErrorMessage = "Event is required.")]
+        public int? EventId { get; set; }
+
+        public string? AdditionalNotes { get; set; }
+    }
+
+    private sealed class LetterDocumentModel
+    {
+        [Required(ErrorMessage = "Recipient name is required.")]
+        public string RecipientName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Letter body is required.")]
+        public string Body { get; set; } = string.Empty;
+
+        public string? AdditionalNotes { get; set; }
+    }
+
+    private sealed class DocumentPreviewModel
+    {
+        public DocumentType Type { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string OrgName { get; set; } = string.Empty;
+        public string AcademicYear { get; set; } = string.Empty;
+        public string MemberName { get; set; } = string.Empty;
+        public string RecipientName { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public string IssuedDate { get; set; } = string.Empty;
+        public string? AdviserName { get; set; }
+        public string? PresidentName { get; set; }
+        public string? AdditionalNotes { get; set; }
+        public bool HasLogo { get; set; }
+        public List<string> BodyLines { get; set; } = [];
+    }
+}

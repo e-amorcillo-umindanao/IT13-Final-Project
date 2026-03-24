@@ -252,6 +252,39 @@ a {
     flex-wrap: wrap;
 }
 
+.engagement-summary-strip {
+    background: #FFFFFF;
+}
+
+.engagement-summary-strip-content {
+    flex-wrap: wrap;
+    column-gap: 16px;
+    row-gap: 8px;
+}
+
+.engagement-summary-text {
+    color: var(--soms-text);
+}
+
+.engagement-stat-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+}
+
+.engagement-stat-dot-high {
+    background: #22C55E;
+}
+
+.engagement-stat-dot-medium {
+    background: #F59E0B;
+}
+
+.engagement-stat-dot-low {
+    background: #EF4444;
+}
+
 .engagement-score-cell {
     min-width: 140px;
 }
@@ -264,6 +297,196 @@ a {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.event-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.event-card .mud-card-content {
+    flex: 1 1 auto;
+}
+
+.event-card-header,
+.event-card-body {
+    padding: 16px;
+}
+
+.event-card-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    min-height: 42px;
+}
+
+.event-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.attendance-summary-bar {
+    flex-wrap: wrap;
+}
+
+.attendance-actions-bar {
+    gap: 12px;
+    flex-wrap: wrap;
+ }
+
+.documents-card {
+    background: #FFFFFF;
+}
+
+.documents-action-row,
+.documents-chip-row {
+    flex-wrap: wrap;
+}
+
+.documents-preview {
+    height: 400px;
+    overflow-y: auto;
+    padding: 20px;
+    background: #F8FAFC;
+}
+
+.documents-preview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+}
+
+.certificate-preview,
+.letter-preview {
+    max-width: 760px;
+    min-height: 100%;
+    margin: 0 auto;
+    background: #FFFFFF;
+}
+
+.certificate-preview {
+    border: 2px solid var(--soms-border);
+    padding: 32px 28px;
+    text-align: center;
+}
+
+.certificate-preview-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 12px;
+    border: 1px dashed var(--soms-border);
+    border-radius: 999px;
+    color: var(--soms-text-muted);
+    font-size: 12px;
+}
+
+.certificate-preview-org,
+.letter-preview-org {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--soms-text);
+}
+
+.certificate-preview-title {
+    margin-top: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+}
+
+.certificate-preview-caption,
+.certificate-preview-line,
+.letter-preview-meta,
+.letter-preview-date,
+.letter-preview-recipient,
+.signature-role {
+    color: var(--soms-text-muted);
+}
+
+.certificate-preview-name {
+    margin: 12px 0;
+    font-size: 28px;
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.certificate-preview-line + .certificate-preview-line {
+    margin-top: 8px;
+}
+
+.certificate-preview-notes,
+.letter-preview-notes {
+    margin-top: 16px;
+    font-style: italic;
+}
+
+.certificate-preview-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+    margin-top: 48px;
+}
+
+.certificate-signature-block,
+.letter-preview-signature {
+    text-align: center;
+}
+
+.signature-line {
+    border-top: 1px solid #94A3B8;
+    margin-bottom: 8px;
+}
+
+.certificate-preview-issued {
+    margin-top: 16px;
+    text-align: right;
+    color: var(--soms-text-muted);
+    font-size: 12px;
+}
+
+.letter-preview {
+    padding: 24px 28px;
+}
+
+.letter-preview-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.letter-preview-recipient {
+    margin-top: 20px;
+    font-weight: 600;
+}
+
+.letter-preview-rule {
+    height: 1px;
+    margin: 12px 0 20px;
+    background: var(--soms-border);
+}
+
+.letter-preview-body {
+    text-align: justify;
+    white-space: pre-wrap;
+    line-height: 1.7;
+}
+
+.letter-preview-signature {
+    width: 220px;
+    margin-left: auto;
+    margin-top: 48px;
 }
 
 .interaction-timeline {
@@ -322,6 +545,132 @@ a {
     border-radius: 4px !important;
 }
 
+.dashboard-kpi-shell {
+    background: #FFFFFF;
+}
+
+.dashboard-section-card,
+.reports-card {
+    background: #FFFFFF;
+    border-radius: 4px !important;
+}
+
+.dashboard-card-fill {
+    height: 100%;
+}
+
+.dashboard-animated {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: dashboard-fade-in 0.35s ease forwards;
+    animation-delay: var(--dashboard-delay, 0ms);
+}
+
+.dashboard-chart-empty {
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dashboard-interaction-list {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.dashboard-interaction-item {
+    padding: 12px 0;
+}
+
+.dashboard-interaction-row {
+    width: 100%;
+}
+
+.dashboard-interaction-avatar {
+    flex-shrink: 0;
+}
+
+.dashboard-interaction-content {
+    width: 100%;
+    min-width: 0;
+}
+
+.dashboard-interaction-heading {
+    gap: 12px;
+    width: 100%;
+}
+
+.reports-button-row {
+    flex-wrap: wrap;
+}
+
+@keyframes dashboard-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.session-lock-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.session-lock-shell {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.session-lock-card {
+    background: #FFFFFF;
+}
+
+/* Remove default MudBlazor box shadows */
+.mud-card {
+    box-shadow: none !important;
+}
+
+.mud-paper {
+    box-shadow: none !important;
+}
+
+.mud-dialog {
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* New York: sharp input corners */
+.mud-input-outlined .mud-input-outlined-border {
+    border-radius: 4px !important;
+}
+
+/* Sidebar nav item active state */
+.mud-nav-item.active > .mud-nav-link {
+    background-color: #3B5BDB !important;
+    color: #FFFFFF !important;
+    border-radius: 4px;
+}
+
+/* Tighten table rows */
+.mud-table-cell {
+    padding: 10px 16px !important;
+}
+
+/* Typography consistency */
+body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+}
+
 #blazor-error-ui {
     background: #fee2e2;
     border-top: 1px solid #fecaca;
@@ -349,5 +698,11 @@ a {
 
     .members-header-actions {
         width: 100%;
+    }
+
+    .certificate-preview-signatures,
+    .letter-preview-top {
+        grid-template-columns: 1fr;
+        display: grid;
     }
 }

@@ -18,19 +18,48 @@
         </MudButton>
     </div>
 
-    <MudStack Row="true" Spacing="1" Class="engagement-summary-bar">
-        <MudChip T="string" Variant="Variant.Filled" Color="Color.Success">High: @HighCount</MudChip>
-        <MudChip T="string" Variant="Variant.Filled" Color="Color.Warning">Medium: @MediumCount</MudChip>
-        <MudChip T="string" Variant="Variant.Filled" Color="Color.Error">Low: @LowCount</MudChip>
-    </MudStack>
+    <MudPaper Elevation="0" Class="engagement-summary-strip" Style="border: 1px solid #E2E8F0; border-radius: 4px; padding: 8px 16px;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="engagement-summary-strip-content">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <span class="engagement-stat-dot engagement-stat-dot-high"></span>
+                <MudText Typo="Typo.body2" Class="engagement-summary-text">High: @HighCount</MudText>
+            </MudStack>
+            <MudDivider Vertical="true" FlexItem="true" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <span class="engagement-stat-dot engagement-stat-dot-medium"></span>
+                <MudText Typo="Typo.body2" Class="engagement-summary-text">Medium: @MediumCount</MudText>
+            </MudStack>
+            <MudDivider Vertical="true" FlexItem="true" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <span class="engagement-stat-dot engagement-stat-dot-low"></span>
+                <MudText Typo="Typo.body2" Class="engagement-summary-text">Low: @LowCount</MudText>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
 
     <MudPaper Class="members-filter-bar" Elevation="0">
-        <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
-            <MudButton Variant="@GetFilterVariant("All")" OnClick="@(() => SetFilter("All"))">All</MudButton>
-            <MudButton Variant="@GetFilterVariant("High")" OnClick="@(() => SetFilter("High"))">High</MudButton>
-            <MudButton Variant="@GetFilterVariant("Medium")" OnClick="@(() => SetFilter("Medium"))">Medium</MudButton>
-            <MudButton Variant="@GetFilterVariant("Low")" OnClick="@(() => SetFilter("Low"))">Low</MudButton>
-        </MudButtonGroup>
+        <MudStack Row="true" Spacing="1" Class="engagement-filter-buttons">
+            <MudButton Variant="@(_activeFilter == "All" ? Variant.Filled : Variant.Outlined)"
+                       Color="@(_activeFilter == "All" ? Color.Primary : Color.Default)"
+                       OnClick="@(() => SetFilter("All"))">
+                All
+            </MudButton>
+            <MudButton Variant="@(_activeFilter == "High" ? Variant.Filled : Variant.Outlined)"
+                       Color="@(_activeFilter == "High" ? Color.Primary : Color.Default)"
+                       OnClick="@(() => SetFilter("High"))">
+                High
+            </MudButton>
+            <MudButton Variant="@(_activeFilter == "Medium" ? Variant.Filled : Variant.Outlined)"
+                       Color="@(_activeFilter == "Medium" ? Color.Primary : Color.Default)"
+                       OnClick="@(() => SetFilter("Medium"))">
+                Medium
+            </MudButton>
+            <MudButton Variant="@(_activeFilter == "Low" ? Variant.Filled : Variant.Outlined)"
+                       Color="@(_activeFilter == "Low" ? Color.Primary : Color.Default)"
+                       OnClick="@(() => SetFilter("Low"))">
+                Low
+            </MudButton>
+        </MudStack>
     </MudPaper>
 
     <MudPaper Class="members-table-shell" Elevation="0">
@@ -140,11 +169,6 @@
     {
         _activeFilter = filter;
     }
-
-    private Variant GetFilterVariant(string filter)
-        => string.Equals(_activeFilter, filter, StringComparison.OrdinalIgnoreCase)
-            ? Variant.Filled
-            : Variant.Outlined;
 
     private async Task OpenLogInteractionDialogAsync(int? memberId = null)
     {

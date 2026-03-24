@@ -16,6 +16,7 @@
                         <MudTextField T="string"
                                       Label="First Name*"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       For="@(() => _model.FirstName)"
                                       @bind-Value="_model.FirstName"
                                       Required="true"
@@ -25,6 +26,7 @@
                         <MudTextField T="string"
                                       Label="Last Name*"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       For="@(() => _model.LastName)"
                                       @bind-Value="_model.LastName"
                                       Required="true"
@@ -34,6 +36,7 @@
                         <MudTextField T="string"
                                       Label="Student ID*"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       For="@(() => _model.StudentId)"
                                       @bind-Value="_model.StudentId"
                                       Required="true"
@@ -43,6 +46,7 @@
                         <MudTextField T="string"
                                       Label="Email"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       For="@(() => _model.Email)"
                                       @bind-Value="_model.Email" />
                     </MudItem>
@@ -50,11 +54,13 @@
                         <MudTextField T="string"
                                       Label="Phone Number"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       @bind-Value="_model.PhoneNumber" />
                     </MudItem>
                     <MudItem xs="12" md="6">
                         <MudDatePicker Label="Join Date*"
                                        Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
                                        Date="_model.JoinDate"
                                        DateChanged="OnJoinDateChanged" />
                     </MudItem>
@@ -62,6 +68,7 @@
                         <MudTextField T="string"
                                       Label="Address"
                                       Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
                                       Lines="2"
                                       @bind-Value="_model.Address" />
                     </MudItem>
@@ -69,6 +76,7 @@
                         <MudSelect T="string"
                                    Label="Status*"
                                    Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
                                    @bind-Value="_model.Status">
                             <MudSelectItem T="string" Value="@("Active")">Active</MudSelectItem>
                             <MudSelectItem T="string" Value="@("Inactive")">Inactive</MudSelectItem>
@@ -79,6 +87,7 @@
                         <MudSelect T="string"
                                    Label="Recruitment Stage*"
                                    Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
                                    @bind-Value="_model.RecruitmentStage">
                             <MudSelectItem T="string" Value="@("Prospect")">Prospect</MudSelectItem>
                             <MudSelectItem T="string" Value="@("Applicant")">Applicant</MudSelectItem>
@@ -126,6 +135,7 @@
                                 <MudSelect T="int?"
                                            Label="Committee"
                                            Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
                                            Value="_selectedCommitteeId"
                                            ValueChanged="OnCommitteeSelectionChanged">
                                     @foreach (var committee in _committees)
@@ -138,11 +148,12 @@
                                 <MudTextField T="string"
                                               Label="Role"
                                               Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
                                               Value="_selectedCommitteeRole"
                                               ValueChanged="OnCommitteeRoleChanged" />
                             </MudItem>
                             <MudItem xs="12" md="2">
-                                <MudButton Variant="Variant.Outlined"
+                                <MudButton Variant="Variant.Filled"
                                            Color="Color.Primary"
                                            FullWidth="true"
                                            Class="mt-md-1"
@@ -157,7 +168,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Cancel" Disabled="_isSaving">Cancel</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isSaving || _isLoading">
             @if (_isSaving)
             {

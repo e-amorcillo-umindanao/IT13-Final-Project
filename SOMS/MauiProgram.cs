@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MudBlazor;
 using MudBlazor.Services;
+using QuestPDF.Infrastructure;
 using SOMS.Data;
 using SOMS.Services;
 
@@ -68,7 +69,11 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(somsTheme);
         builder.Services.AddMauiBlazorWebView();
-        builder.Services.AddMudServices();
+        builder.Services.AddMudServices(config =>
+        {
+            config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomRight;
+            config.SnackbarConfiguration.ShowCloseIcon = true;
+        });
         builder.Services.AddDbContext<AppDbContext>();
         builder.Services.AddSingleton<AuthService>();
         builder.Services.AddScoped<MemberService>();
@@ -79,12 +84,15 @@ public static class MauiProgram
         builder.Services.AddScoped<DocumentService>();
         builder.Services.AddScoped<ReportService>();
         builder.Services.AddScoped<AuditService>();
-        builder.Services.AddScoped<BackupService>();
+        builder.Services.AddSingleton<BackupService>();
+        builder.Services.AddScoped<SettingsService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
+
+        QuestPDF.Settings.License = LicenseType.Community;
 
         var app = builder.Build();
 

@@ -1,46 +1,37 @@
-using Microsoft.Extensions.DependencyInjection;
-using SOMS.Services;
-
-namespace SOMS;
-
-public partial class App : Application
+namespace SOMS
 {
-    private readonly IServiceProvider _services;
-
-    public App(IServiceProvider services)
+    public partial class App : Application
     {
-        _services = services;
-        InitializeComponent();
-    }
+        private readonly SOMS.Services.BackupService _backupService;
 
-    protected override Window CreateWindow(IActivationState? activationState)
-    {
-        var window = new Window(new MainPage()) { Title = "SOMS" };
-        window.Stopped += OnWindowStopped;
-        window.Destroying += OnWindowDestroying;
-        return window;
-    }
+        public App(SOMS.Services.BackupService backupService)
+        {
+            InitializeComponent();
+            _backupService = backupService;
+        }
 
-    protected override void OnSleep()
-    {
-        base.OnSleep();
-        _ = TriggerBackupAsync();
-    }
+        protected override Window CreateWindow(IActivationState? activationState)
+        {
+            var window = new Window(new MainPage());
+            window.Stopped += HandleWindowStopped;
+            window.Destroying += HandleWindowDestroying;
+            return window;
+        }
 
-    private void OnWindowStopped(object? sender, EventArgs e)
-    {
-        _ = TriggerBackupAsync();
-    }
+        protected override async void OnSleep()
+        {
+            base.OnSleep();
+            await _backupService.BackupAsync();
+        }
 
-    private void OnWindowDestroying(object? sender, EventArgs e)
-    {
-        _ = TriggerBackupAsync();
-    }
+        private async void HandleWindowStopped(object? sender, EventArgs e)
+        {
+            await _backupService.BackupAsync();
+        }
 
-    private async Task TriggerBackupAsync()
-    {
-        using var scope = _services.CreateScope();
-        var backupService = scope.ServiceProvider.GetRequiredService<BackupService>();
-        await backupService.BackupAsync();
+        private async void HandleWindowDestroying(object? sender, EventArgs e)
+        {
+            await _backupService.BackupAsync();
+        }
     }
 }

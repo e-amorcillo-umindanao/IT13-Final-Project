@@ -28,7 +28,11 @@
 
         @if (authService.CurrentRole == "Admin")
         {
-            <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">
+            <MudNavLink Href="/settings"
+                        Match="NavLinkMatch.Prefix"
+                        ActiveClass="active"
+                        Class="soms-sidebar-link"
+                        Icon="@Icons.Material.Filled.Settings">
                 Settings
             </MudNavLink>
         }

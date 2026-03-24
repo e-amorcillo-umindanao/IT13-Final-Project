@@ -1,0 +1,108 @@
+@using AuditLogEntry = SOMS.Models.AuditLog
+@inject AuditService AuditService
+
+<MudStack Spacing="3">
+    <div>
+        <MudText Typo="Typo.h6">Audit Log</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Review recorded changes across the system.</MudText>
+    </div>
+
+    <MudTextField T="string"
+                  Label="Search by action or username"
+                  Variant="Variant.Outlined"
+                  Margin="Margin.Dense"
+                  Value="_searchText"
+                  ValueChanged="OnSearchChangedAsync"
+                  Immediate="true"
+                  DebounceInterval="300"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search" />
+
+    <MudPaper Class="members-table-shell" Elevation="0">
+        <MudTable T="AuditLogEntry"
+                  @ref="_table"
+                  ServerData="LoadServerDataAsync"
+                  Loading="_isLoading"
+                  Dense="true"
+                  Hover="true"
+                  Elevation="0"
+                  RowsPerPage="50"
+                  Breakpoint="Breakpoint.Sm"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px;">
+            <ToolBarContent>
+                @if (_isLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Timestamp</MudTh>
+                <MudTh>User</MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Table</MudTh>
+                <MudTh>Record ID</MudTh>
+                <MudTh>Details</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Timestamp">@context.Timestamp.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</MudTd>
+                <MudTd DataLabel="User">@context.User.Username</MudTd>
+                <MudTd DataLabel="Action">@context.Action</MudTd>
+                <MudTd DataLabel="Table">@context.TableAffected</MudTd>
+                <MudTd DataLabel="Record ID">@(context.RecordId?.ToString() ?? "-")</MudTd>
+                <MudTd DataLabel="Details">@DisplayValue(context.Details)</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <div class="pa-4">
+                    <EmptyState Message="No audit log entries matched your search." Icon="@Icons.Material.Filled.History" />
+                </div>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="[50]" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</MudStack>
+
+@code {
+    private MudTable<AuditLogEntry>? _table;
+    private string? _searchText;
+    private bool _isLoading;
+
+    private async Task<TableData<AuditLogEntry>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
+    {
+        _isLoading = true;
+
+        try
+        {
+            var page = state.Page + 1;
+            var pageSize = state.PageSize <= 0 ? 50 : state.PageSize;
+
+            var logsTask = AuditService.GetLogsAsync(_searchText, page, pageSize);
+            var countTask = AuditService.GetLogCountAsync(_searchText);
+
+            await Task.WhenAll(logsTask, countTask);
+
+            return new TableData<AuditLogEntry>
+            {
+                Items = await logsTask,
+                TotalItems = await countTask
+            };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnSearchChangedAsync(string value)
+    {
+        _searchText = value;
+        if (_table is not null)
+        {
+            await _table.ReloadServerData();
+        }
+    }
+
+    private static string DisplayValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+}

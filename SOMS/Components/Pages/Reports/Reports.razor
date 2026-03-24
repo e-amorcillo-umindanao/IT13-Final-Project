@@ -1,5 +1,251 @@
 @page "/reports"
+@layout MainLayout
+@using Microsoft.Maui.ApplicationModel
+@inject ReportService ReportService
+@inject EventService EventService
+@inject ISnackbar Snackbar
 
-<MudPaper Class="page-surface">
-    <MudText Typo="Typo.h6" data-page-title="true">Reports</MudText>
-</MudPaper>
+<PageTitle>Reports</PageTitle>
+
+<MudStack Spacing="3">
+    <PageHeader Title="Reports" Subtitle="Export member and attendance data" />
+
+    @if (_isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudCard Class="reports-card dashboard-card-fill">
+                    <MudCardContent>
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.h6">Member List Report</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Export a full list of all active members with engagement scores.
+                            </MudText>
+
+                            <MudStack Row="true" Spacing="2" Class="reports-button-row">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                           Disabled="@HasExportInProgress"
+                                           OnClick="ExportMemberListPdfAsync">
+                                    @if (_activeExport == ReportExport.MemberPdf)
+                                    {
+                                        <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                                        <span>Generating PDF...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Export as PDF</span>
+                                    }
+                                </MudButton>
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.TableChart"
+                                           Disabled="@HasExportInProgress"
+                                           OnClick="ExportMemberListExcelAsync">
+                                    @if (_activeExport == ReportExport.MemberExcel)
+                                    {
+                                        <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                                        <span>Generating Excel...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Export as Excel</span>
+                                    }
+                                </MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudCard Class="reports-card dashboard-card-fill">
+                    <MudCardContent>
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.h6">Attendance Report</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Export attendance records for all events or a specific event.
+                            </MudText>
+
+                            <MudSelect T="int?"
+                                       Label="Filter by Event"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Value="_selectedEventId"
+                                       ValueChanged="OnSelectedEventChangedAsync">
+                                <MudSelectItem T="int?" Value="@((int?)null)">All Events</MudSelectItem>
+                                @foreach (var eventItem in _pastEvents)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)eventItem.EventId)">
+                                        @eventItem.Title (@eventItem.EventDate.ToString("MMMM dd, yyyy"))
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudStack Row="true" Spacing="2" Class="reports-button-row">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                                           Disabled="@HasExportInProgress"
+                                           OnClick="ExportAttendancePdfAsync">
+                                    @if (_activeExport == ReportExport.AttendancePdf)
+                                    {
+                                        <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                                        <span>Generating PDF...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Export as PDF</span>
+                                    }
+                                </MudButton>
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.TableChart"
+                                           Disabled="@HasExportInProgress"
+                                           OnClick="ExportAttendanceExcelAsync">
+                                    @if (_activeExport == ReportExport.AttendanceExcel)
+                                    {
+                                        <MudProgressCircular Class="me-2" Indeterminate="true" Size="Size.Small" Color="Color.Inherit" />
+                                        <span>Generating Excel...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Export as Excel</span>
+                                    }
+                                </MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    private List<Event> _pastEvents = [];
+    private int? _selectedEventId;
+    private ReportExport _activeExport = ReportExport.None;
+    private bool _isLoading = true;
+
+    private bool HasExportInProgress => _activeExport != ReportExport.None;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var events = await EventService.GetAllAsync();
+        _pastEvents = events
+            .Where(eventItem => eventItem.EventDate < DateTime.Today)
+            .OrderByDescending(eventItem => eventItem.EventDate)
+            .ThenByDescending(eventItem => eventItem.EventId)
+            .ToList();
+
+        _isLoading = false;
+    }
+
+    private Task OnSelectedEventChangedAsync(int? value)
+    {
+        _selectedEventId = value;
+        return Task.CompletedTask;
+    }
+
+    private Task ExportMemberListPdfAsync()
+        => ExportReportAsync(
+            ReportExport.MemberPdf,
+            () => ReportService.ExportMemberListToPdfAsync(),
+            bytes => ReportService.SavePdfToFileAsync(bytes, BuildSafeFileName("member-list-report", ".pdf")));
+
+    private Task ExportMemberListExcelAsync()
+        => ExportReportAsync(
+            ReportExport.MemberExcel,
+            () => ReportService.ExportMemberListToExcelAsync(),
+            bytes => ReportService.SaveExcelToFileAsync(bytes, BuildSafeFileName("member-list-report", ".xlsx")));
+
+    private Task ExportAttendancePdfAsync()
+        => ExportReportAsync(
+            ReportExport.AttendancePdf,
+            () => ReportService.ExportAttendanceToPdfAsync(_selectedEventId),
+            bytes => ReportService.SavePdfToFileAsync(bytes, BuildAttendanceFileName(".pdf")));
+
+    private Task ExportAttendanceExcelAsync()
+        => ExportReportAsync(
+            ReportExport.AttendanceExcel,
+            () => ReportService.ExportAttendanceToExcelAsync(_selectedEventId),
+            bytes => ReportService.SaveExcelToFileAsync(bytes, BuildAttendanceFileName(".xlsx")));
+
+    private async Task ExportReportAsync(
+        ReportExport exportType,
+        Func<Task<byte[]>> generateAsync,
+        Func<byte[], Task<string>> saveAsync)
+    {
+        if (HasExportInProgress)
+        {
+            return;
+        }
+
+        _activeExport = exportType;
+
+        try
+        {
+            var bytes = await generateAsync();
+            var path = await saveAsync(bytes);
+            var fileName = Path.GetFileName(path);
+
+            await Launcher.Default.OpenAsync(new OpenFileRequest
+            {
+                File = new ReadOnlyFile(path)
+            });
+
+            Snackbar.Add($"Report exported: {fileName}", Severity.Success);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add($"Unable to export the report: {exception.Message}", Severity.Error);
+        }
+        finally
+        {
+            _activeExport = ReportExport.None;
+        }
+    }
+
+    private string BuildAttendanceFileName(string extension)
+    {
+        var prefix = _selectedEventId.HasValue
+            ? $"attendance-report-{GetSelectedEventLabel()}"
+            : "attendance-report-all-events";
+
+        return BuildSafeFileName(prefix, extension);
+    }
+
+    private string GetSelectedEventLabel()
+    {
+        var eventItem = _pastEvents.FirstOrDefault(item => item.EventId == _selectedEventId);
+        return eventItem is null ? $"event-{_selectedEventId}" : eventItem.Title;
+    }
+
+    private static string BuildSafeFileName(string prefix, string extension)
+    {
+        var invalidCharacters = Path.GetInvalidFileNameChars();
+        var sanitizedPrefix = new string(prefix.Select(character => invalidCharacters.Contains(character) ? '-' : character).ToArray());
+        return $"{sanitizedPrefix.Trim().Replace("  ", " ")}-{DateTime.Now:yyyyMMdd-HHmmss}{extension}";
+    }
+
+    private enum ReportExport
+    {
+        None,
+        MemberPdf,
+        MemberExcel,
+        AttendancePdf,
+        AttendanceExcel
+    }
+}

@@ -34,6 +34,7 @@
                 <MudTextField T="string"
                               Label="Search"
                               Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
                               Value="_searchQuery"
                               ValueChanged="OnSearchChangedAsync"
                               Adornment="Adornment.Start"
@@ -45,6 +46,7 @@
                 <MudSelect T="string"
                            Label="Status"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Value="_statusFilter"
                            ValueChanged="OnStatusChangedAsync">
                     <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
@@ -57,6 +59,7 @@
                 <MudSelect T="string"
                            Label="Committee"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Value="_committeeFilter"
                            ValueChanged="OnCommitteeChangedAsync">
                     <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
@@ -70,6 +73,7 @@
                 <MudSelect T="string"
                            Label="Stage"
                            Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
                            Value="_stageFilter"
                            ValueChanged="OnStageChangedAsync">
                     <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
@@ -315,7 +319,7 @@
             .OrderBy(name => name)
             .ToList();
 
-        return committeeNames.Count == 0 ? "—" : string.Join(", ", committeeNames!);
+        return committeeNames.Count == 0 ? "-" : string.Join(", ", committeeNames!);
     }
 
     private int GetEngagementScore(Member member)

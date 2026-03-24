@@ -1,13 +1,14 @@
 using Microsoft.UI.Xaml;
 
-namespace SOMS.WinUI;
-
-public partial class App : MauiWinUIApplication
+namespace SOMS.WinUI
 {
-    public App()
+    public partial class App : MauiWinUIApplication
     {
-        InitializeComponent();
-    }
+        public App()
+        {
+            this.InitializeComponent();
+        }
 
-    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+        protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+    }
 }
