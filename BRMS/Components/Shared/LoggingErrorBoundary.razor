@@ -1,0 +1,12 @@
+@inherits ErrorBoundary
+
+@ChildContent
+
+@code {
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Console.WriteLine($"Blazor unhandled exception: {exception.Message}");
+        Console.WriteLine(exception);
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,205 @@
+@page "/clearance/new"
+@inject ClearanceService ClearanceService
+@inject ResidentService ResidentService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>New Clearance Request</PageTitle>
+
+<div class="clearance-form-page">
+    <div class="clearance-form-header">
+        <h1 class="clearance-form-title">New Clearance Request</h1>
+    </div>
+
+    <div class="clearance-form-shell">
+        <MudCard Elevation="0"
+                 Class="clearance-form-card"
+                 Style="border:1px solid #E2E8F0; border-radius:4px; padding:32px;">
+            <MudForm @ref="_form">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12">
+                        <MudAutocomplete T="Resident"
+                                         Value="_selectedResident"
+                                         ValueChanged="HandleResidentChangedAsync"
+                                         Label="Select Resident"
+                                         Variant="Variant.Outlined"
+                                         Style="border-radius:4px"
+                                         SearchFunc="SearchResidentsAsync"
+                                         ToStringFunc="ResidentToString"
+                                         ShowProgressIndicator="true"
+                                         FullWidth="true"
+                                         CoerceText="true"
+                                         ResetValueOnEmptyText="true"
+                                         Clearable="true"
+                                         Required="true"
+                                         RequiredError="Resident is required." />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   Value="_selectedPurpose"
+                                   ValueChanged="HandlePurposeChanged"
+                                   Label="Purpose"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius:4px"
+                                   FullWidth="true"
+                                   Required="true"
+                                   RequiredError="Purpose is required.">
+                            @foreach (var purpose in PurposeOptions)
+                            {
+                                <MudSelectItem Value="@purpose">@purpose</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <div class="clearance-form-actions">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Style="border-radius:4px;"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius:4px;"
+                               Disabled="_isSaving"
+                               OnClick="HandleSubmitAsync">
+                        Submit
+                    </MudButton>
+                </div>
+            </MudForm>
+        </MudCard>
+    </div>
+</div>
+
+@code {
+    private static readonly string[] PurposeOptions =
+    [
+        "Employment",
+        "Travel",
+        "School",
+        "Business",
+        "Other"
+    ];
+
+    private MudForm _form = default!;
+    private Resident? _selectedResident;
+    private string _selectedPurpose = string.Empty;
+    private bool _isSaving;
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    private async Task<IEnumerable<Resident>> SearchResidentsAsync(string value, CancellationToken cancellationToken)
+    {
+        var residents = await ResidentService.SearchResidentsAsync(value, "Active", null, null, null);
+        return residents.Take(10);
+    }
+
+    private Task HandleResidentChangedAsync(Resident? resident)
+    {
+        _selectedResident = resident;
+        return Task.CompletedTask;
+    }
+
+    private void HandlePurposeChanged(string value)
+    {
+        _selectedPurpose = value;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        await _form.ValidateAsync();
+        if (!_form.IsValid || _selectedResident is null || string.IsNullOrWhiteSpace(_selectedPurpose))
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var request = new ClearanceRequest
+            {
+                ResidentId = _selectedResident.ResidentId,
+                Purpose = _selectedPurpose
+            };
+
+            await ClearanceService.CreateClearanceRequestAsync(request, CurrentUserId);
+            Snackbar.Add("Clearance request submitted successfully.", Severity.Success);
+            NavigationManager.NavigateTo("/clearance");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Clearance request failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/clearance");
+    }
+
+    private static string ResidentToString(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}
+
+<style>
+    .clearance-form-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .clearance-form-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .clearance-form-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .clearance-form-shell {
+        width: 100%;
+        max-width: 600px;
+    }
+
+    .clearance-form-card {
+        background: #FFFFFF;
+    }
+
+    .clearance-form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+    }
+</style>

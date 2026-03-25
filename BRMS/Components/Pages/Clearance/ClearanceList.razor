@@ -1,0 +1,647 @@
+﻿@page "/clearance"
+@inject ClearanceService ClearanceService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Barangay Clearance</PageTitle>
+
+<div class="clearance-page">
+    <div class="clearance-header">
+        <h1 class="clearance-title">Barangay Clearance</h1>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px;box-shadow:none;"
+                   OnClick="@(() => NavigationManager.NavigateTo("/clearance/new"))">
+            New Request
+        </MudButton>
+    </div>
+
+    <MudGrid Spacing="2" Class="clearance-filter-grid">
+        <MudItem xs="12" md="8">
+            <MudTextField T="string"
+                          Value="_searchName"
+                          ValueChanged="HandleSearchNameChanged"
+                          Placeholder="Search by resident name..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="border-radius:4px"
+                          FullWidth="true"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedStatus"
+                       ValueChanged="HandleStatusChanged"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px"
+                       Label="Status"
+                       FullWidth="true">
+                @foreach (var option in StatusOptions)
+                {
+                    <MudSelectItem Value="@option">@option</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="ClearanceRequest"
+              Items="FilteredRequests"
+              Elevation="0"
+              Striped="false"
+              Hover="true"
+              RowStyle="height:52px"
+              RowsPerPage="10"
+              Loading="_isLoading"
+              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+              Class="clearance-table">
+        <HeaderContent>
+            <MudTh>RESIDENT NAME</MudTh>
+            <MudTh>PURPOSE</MudTh>
+            <MudTh>REQUESTED AT</MudTh>
+            <MudTh>STATUS</MudTh>
+            <MudTh>VALID UNTIL</MudTh>
+            <MudTh>PROCESSED BY</MudTh>
+            <MudTh>ACTIONS</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="request">
+            <MudTd DataLabel="RESIDENT NAME" Class="clearance-cell-primary">@GetResidentName(request.Resident)</MudTd>
+            <MudTd DataLabel="PURPOSE" Class="clearance-cell-primary">@request.Purpose</MudTd>
+            <MudTd DataLabel="REQUESTED AT" Class="clearance-cell-muted">@FormatDate(request.RequestedAt)</MudTd>
+            <MudTd DataLabel="STATUS">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Filled"
+                         Style="@GetStatusChipStyle(request.Status)"
+                         Class="clearance-status-chip">
+                    @request.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="VALID UNTIL" Class="clearance-cell-muted">@FormatDate(request.ValidUntil)</MudTd>
+            <MudTd DataLabel="PROCESSED BY" Class="clearance-cell-muted">@(request.ProcessedByUser?.Username ?? "-")</MudTd>
+            <MudTd DataLabel="ACTIONS">
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                               Size="Size.Small"
+                               Color="Color.Default"
+                               Style="color:#64748B;"
+                               OnClick="@(() => OpenDetailsDialogAsync(request.ClearanceId))" />
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <div class="clearance-empty-state">
+                <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Size="Size.Large" Class="clearance-empty-icon" />
+                <div class="clearance-empty-title">No clearance requests found</div>
+                <div class="clearance-empty-message">No clearance requests matched the current filters.</div>
+            </div>
+        </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+<MudDialog @bind-Visible="_detailsDialogOpen"
+           Options="_detailDialogOptions"
+           TitleClass="clearance-dialog-title"
+           ContentClass="clearance-dialog-content"
+           ActionsClass="clearance-dialog-actions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Clearance Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_dialogLoading)
+        {
+            <div class="clearance-dialog-loading">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else if (_selectedRequest is null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Clearance request not found.</MudAlert>
+        }
+        else
+        {
+            <div class="clearance-detail-grid">
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Resident Name</div>
+                    <div class="clearance-detail-value">@GetResidentName(_selectedRequest.Resident)</div>
+                </div>
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Purpose</div>
+                    <div class="clearance-detail-value">@_selectedRequest.Purpose</div>
+                </div>
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Requested At</div>
+                    <div class="clearance-detail-value">@FormatDate(_selectedRequest.RequestedAt)</div>
+                </div>
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Status</div>
+                    <div class="clearance-detail-value">@_selectedRequest.Status</div>
+                </div>
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Valid Until</div>
+                    <div class="clearance-detail-value">@FormatDate(_selectedRequest.ValidUntil)</div>
+                </div>
+                <div class="clearance-detail-field">
+                    <div class="clearance-detail-label">Processed By</div>
+                    <div class="clearance-detail-value">@(_selectedRequest.ProcessedByUser?.Username ?? "-")</div>
+                </div>
+                <div class="clearance-detail-field clearance-detail-field-full">
+                    <div class="clearance-detail-label">Remarks</div>
+                    <div class="clearance-detail-value">@(string.IsNullOrWhiteSpace(_selectedRequest.Remarks) ? "-" : _selectedRequest.Remarks)</div>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_selectedRequest is not null && _selectedRequest.Status == "Pending" && CanProcess)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       Style="border-radius:4px;"
+                       OnClick="OpenRejectDialog">
+                Reject
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       Style="border-radius:4px;"
+                       OnClick="OpenApproveDialog">
+                Approve
+            </MudButton>
+        }
+        @if (_selectedRequest is not null && _selectedRequest.Status == "Approved")
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Style="border-radius:4px;"
+                       OnClick="PrintClearancePdfAsync">
+                Print Clearance PDF
+            </MudButton>
+        }
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px;"
+                   OnClick="CloseDetailsDialog">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_approveDialogOpen"
+           Options="_subDialogOptions"
+           TitleClass="clearance-dialog-title"
+           ContentClass="clearance-dialog-content"
+           ActionsClass="clearance-dialog-actions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Approve Clearance</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12">
+                <MudDatePicker Date="_approveValidUntil"
+                               DateChanged="HandleApproveValidUntilChanged"
+                               Label="Valid Until*"
+                               Variant="Variant.Outlined"
+                               Style="border-radius:4px"
+                               Editable="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string"
+                              Value="_approveRemarks"
+                              ValueChanged="HandleApproveRemarksChanged"
+                              Label="Remarks"
+                              Variant="Variant.Outlined"
+                              Style="border-radius:4px"
+                              FullWidth="true"
+                              Lines="4" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px;"
+                   OnClick="CloseApproveDialog">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Success"
+                   Style="border-radius:4px;"
+                   Disabled="@(!_approveValidUntil.HasValue)"
+                   OnClick="ApproveSelectedAsync">
+            Confirm
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_rejectDialogOpen"
+           Options="_subDialogOptions"
+           TitleClass="clearance-dialog-title"
+           ContentClass="clearance-dialog-content"
+           ActionsClass="clearance-dialog-actions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Reject Clearance</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string"
+                      Value="_rejectRemarks"
+                      ValueChanged="HandleRejectRemarksChanged"
+                      Label="Remarks*"
+                      Variant="Variant.Outlined"
+                      Style="border-radius:4px"
+                      FullWidth="true"
+                      Lines="4" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px;"
+                   OnClick="CloseRejectDialog">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Style="border-radius:4px;"
+                   Disabled="@string.IsNullOrWhiteSpace(_rejectRemarks)"
+                   OnClick="RejectSelectedAsync">
+            Confirm
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static readonly string[] StatusOptions = ["All", "Pending", "Approved", "Rejected"];
+
+    private readonly DialogOptions _detailDialogOptions = new()
+    {
+        FullWidth = true,
+        MaxWidth = MaxWidth.Medium,
+        CloseOnEscapeKey = true
+    };
+
+    private readonly DialogOptions _subDialogOptions = new()
+    {
+        FullWidth = true,
+        MaxWidth = MaxWidth.Small,
+        CloseOnEscapeKey = true
+    };
+
+    private List<ClearanceRequest> _requests = [];
+    private bool _isLoading = true;
+    private string _searchName = string.Empty;
+    private string _selectedStatus = "All";
+
+    private bool _detailsDialogOpen;
+    private bool _approveDialogOpen;
+    private bool _rejectDialogOpen;
+    private bool _dialogLoading;
+    private ClearanceRequest? _selectedRequest;
+    private BarangaySettings? _settings;
+    private DateTime? _approveValidUntil = DateTime.Today.AddMonths(6);
+    private string? _approveRemarks;
+    private string? _rejectRemarks;
+
+    private bool CanProcess =>
+        string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(AuthService.GetCurrentRole(), "Kagawad", StringComparison.OrdinalIgnoreCase);
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    private IEnumerable<ClearanceRequest> FilteredRequests =>
+        _requests.Where(request =>
+        {
+            var matchesName = string.IsNullOrWhiteSpace(_searchName) ||
+                              GetResidentName(request.Resident).Contains(_searchName, StringComparison.OrdinalIgnoreCase);
+            var matchesStatus = string.Equals(_selectedStatus, "All", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(request.Status, _selectedStatus, StringComparison.OrdinalIgnoreCase);
+            return matchesName && matchesStatus;
+        });
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequestsAsync();
+    }
+
+    private async Task LoadRequestsAsync()
+    {
+        _isLoading = true;
+        _requests = await ClearanceService.GetAllClearanceRequestsAsync();
+        _isLoading = false;
+    }
+
+    private void HandleSearchNameChanged(string value)
+    {
+        _searchName = value;
+    }
+
+    private void HandleStatusChanged(string value)
+    {
+        _selectedStatus = value;
+    }
+
+    private async Task OpenDetailsDialogAsync(int clearanceId)
+    {
+        _detailsDialogOpen = true;
+        _dialogLoading = true;
+        _selectedRequest = await ClearanceService.GetClearanceByIdAsync(clearanceId);
+        _settings = await DbContext.BarangaySettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(settings => settings.SettingId == 1);
+        _dialogLoading = false;
+    }
+
+    private void CloseDetailsDialog()
+    {
+        _detailsDialogOpen = false;
+        _approveDialogOpen = false;
+        _rejectDialogOpen = false;
+        _selectedRequest = null;
+        ResetDialogState();
+    }
+
+    private void OpenApproveDialog()
+    {
+        _approveValidUntil = DateTime.Today.AddMonths(6);
+        _approveRemarks = string.Empty;
+        _approveDialogOpen = true;
+    }
+
+    private void CloseApproveDialog()
+    {
+        _approveDialogOpen = false;
+    }
+
+    private void OpenRejectDialog()
+    {
+        _rejectRemarks = string.Empty;
+        _rejectDialogOpen = true;
+    }
+
+    private void CloseRejectDialog()
+    {
+        _rejectDialogOpen = false;
+    }
+
+    private void HandleApproveValidUntilChanged(DateTime? value)
+    {
+        _approveValidUntil = value;
+    }
+
+    private void HandleApproveRemarksChanged(string value)
+    {
+        _approveRemarks = value;
+    }
+
+    private void HandleRejectRemarksChanged(string value)
+    {
+        _rejectRemarks = value;
+    }
+
+    private async Task ApproveSelectedAsync()
+    {
+        if (_selectedRequest is null || !_approveValidUntil.HasValue)
+        {
+            return;
+        }
+
+        var approved = await ClearanceService.ApproveClearanceAsync(
+            _selectedRequest.ClearanceId,
+            CurrentUserId,
+            _approveValidUntil.Value,
+            _approveRemarks);
+
+        if (!approved)
+        {
+            Snackbar.Add("Clearance request could not be approved.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Clearance request approved.", Severity.Success);
+        _approveDialogOpen = false;
+        _detailsDialogOpen = false;
+        await LoadRequestsAsync();
+        ResetDialogState();
+    }
+
+    private async Task RejectSelectedAsync()
+    {
+        if (_selectedRequest is null || string.IsNullOrWhiteSpace(_rejectRemarks))
+        {
+            return;
+        }
+
+        var rejected = await ClearanceService.RejectClearanceAsync(
+            _selectedRequest.ClearanceId,
+            CurrentUserId,
+            _rejectRemarks);
+
+        if (!rejected)
+        {
+            Snackbar.Add("Clearance request could not be rejected.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Clearance request rejected.", Severity.Success);
+        _rejectDialogOpen = false;
+        _detailsDialogOpen = false;
+        await LoadRequestsAsync();
+        ResetDialogState();
+    }
+
+    private async Task PrintClearancePdfAsync()
+    {
+        if (_selectedRequest?.Resident is null || _settings is null)
+        {
+            Snackbar.Add("Clearance PDF could not be generated.", Severity.Error);
+            return;
+        }
+
+        var pdfBytes = await PdfExportHelper.GenerateClearancePdfAsync(_selectedRequest, _selectedRequest.Resident, _settings);
+        var picker = new Windows.Storage.Pickers.FileSavePicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = $"Clearance-{_selectedRequest.ClearanceId}"
+        };
+
+        picker.FileTypeChoices.Add("PDF Document", [".pdf"]);
+
+        var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+        var platformWindow = mauiWindow?.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+        if (platformWindow is null)
+        {
+            Snackbar.Add("Save dialog is not available right now.", Severity.Error);
+            return;
+        }
+
+        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(platformWindow);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+
+        var file = await picker.PickSaveFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        await Windows.Storage.FileIO.WriteBytesAsync(file, pdfBytes);
+        Snackbar.Add("Clearance PDF saved.", Severity.Success);
+    }
+
+    private void ResetDialogState()
+    {
+        _selectedRequest = null;
+        _approveValidUntil = DateTime.Today.AddMonths(6);
+        _approveRemarks = string.Empty;
+        _rejectRemarks = string.Empty;
+    }
+
+    private static string GetResidentName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return "-";
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMM dd, yyyy")
+            : "-";
+    }
+
+    private static string GetStatusChipStyle(string? status)
+    {
+        return status?.Trim() switch
+        {
+            "Pending" => "background:#F59E0B;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            "Approved" => "background:#22C55E;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            "Rejected" => "background:#EF4444;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            _ => "background:#94A3B8;color:#FFFFFF;border-radius:4px;box-shadow:none;"
+        };
+    }
+}
+
+<style>
+    .clearance-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .clearance-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .clearance-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .clearance-filter-grid {
+        align-items: end;
+    }
+
+    .clearance-table {
+        overflow: hidden;
+    }
+
+    .clearance-cell-primary {
+        color: #1E293B;
+    }
+
+    .clearance-cell-muted {
+        color: #64748B;
+    }
+
+    .clearance-status-chip {
+        font-weight: 600;
+    }
+
+    .clearance-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 220px;
+        padding: 32px 16px;
+        text-align: center;
+    }
+
+    .clearance-empty-icon {
+        font-size: 48px;
+        color: #94A3B8;
+    }
+
+    .clearance-empty-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .clearance-empty-message {
+        color: #64748B;
+        font-size: 0.95rem;
+    }
+
+    .clearance-dialog-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+    }
+
+    .clearance-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .clearance-detail-field {
+        padding: 16px;
+        border: 1px solid #E2E8F0;
+        border-radius: 4px;
+        background: #FFFFFF;
+    }
+
+    .clearance-detail-field-full {
+        grid-column: 1 / -1;
+    }
+
+    .clearance-detail-label {
+        margin-bottom: 6px;
+        color: #64748B;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .clearance-detail-value {
+        color: #1E293B;
+        font-size: 0.95rem;
+    }
+
+    @@media (max-width: 900px) {
+        .clearance-detail-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

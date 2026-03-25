@@ -1,0 +1,142 @@
+@inject AuthService AuthService
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Username"
+                                  For="@(() => _model.Username)"
+                                  Label="Username*"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Password"
+                                  For="@(() => _model.Password)"
+                                  Label="Password*"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="TogglePasswordVisibility" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="int" @onblur="StateHasChanged"
+                               @bind-Value="_model.RoleId"
+                               For="@(() => _model.RoleId)"
+                               Label="Role*"
+                               Variant="Variant.Outlined"
+                               FullWidth="true">
+                        @foreach (var role in _roles)
+                        {
+                            <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudAutocomplete T="Resident"
+                                     Label="Linked Resident"
+                                     Variant="Variant.Outlined"
+                                     FullWidth="true"
+                                     SearchFunc="SearchResidentsAsync"
+                                     ToStringFunc="ResidentToString"
+                                     Value="_selectedResident"
+                                     ValueChanged="HandleResidentChangedAsync"
+                                     ResetValueOnEmptyText="true"
+                                     CoerceText="true"
+                                     Clearable="true" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleSubmit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private readonly AddUserDialogModel _model = new();
+    private List<Role> _roles = [];
+    private Resident? _selectedResident;
+    private bool _showPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await AuthService.GetAllRolesAsync();
+        if (_roles.Count > 0)
+        {
+            _model.RoleId = _roles[0].RoleId;
+        }
+    }
+
+    private async Task<IEnumerable<Resident>> SearchResidentsAsync(string value, CancellationToken cancellationToken)
+    {
+        var residents = await AuthService.SearchResidentsForLinkAsync(value);
+        return residents;
+    }
+
+    private Task HandleResidentChangedAsync(Resident? resident)
+    {
+        _selectedResident = resident;
+        _model.LinkedResidentId = resident?.ResidentId;
+        return Task.CompletedTask;
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Username) ||
+            string.IsNullOrWhiteSpace(_model.Password) ||
+            _model.RoleId <= 0)
+        {
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private static string ResidentToString(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    public sealed class AddUserDialogModel
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Range(1, int.MaxValue)]
+        public int RoleId { get; set; }
+
+        public int? LinkedResidentId { get; set; }
+    }
+}

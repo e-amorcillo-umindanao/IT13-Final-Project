@@ -1,0 +1,943 @@
+﻿@page "/settings"
+@using AuditLogModel = BRMS.Models.AuditLog
+@using Microsoft.AspNetCore.Components.Web
+@inject AppDbContext DbContext
+@inject AuthService AuthService
+@inject AuditService AuditService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings</PageTitle>
+
+@if (_isAuthorized)
+{
+    <div class="settings-page">
+        <div class="settings-header">
+            <h1 class="settings-title">Settings</h1>
+        </div>
+
+        @if (_isLoading)
+        {
+            <MudCard Elevation="0" Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; background:#FFFFFF;">
+                <div class="settings-loading">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                </div>
+            </MudCard>
+        }
+        else
+        {
+            <MudTabs Class="settings-tabs"
+                     Style="border-bottom:1px solid #E2E8F0; margin-bottom:24px">
+                <MudTabPanel Text="BARANGAY INFO">
+                    <MudCard Elevation="0"
+                             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; background:#FFFFFF;">
+                        <EditForm Model="_settingsModel" OnValidSubmit="SaveSettingsAsync">
+                            <DataAnnotationsValidator />
+
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.BarangayName"
+                                                  For="@(() => _settingsModel.BarangayName)"
+                                                  Label="Barangay Name"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.Municipality"
+                                                  For="@(() => _settingsModel.Municipality)"
+                                                  Label="Municipality"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.Province"
+                                                  For="@(() => _settingsModel.Province)"
+                                                  Label="Province"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.CaptainName"
+                                                  Label="Captain Name"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.SecretaryName"
+                                                  Label="Secretary Name"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.ContactNumber"
+                                                  Label="Contact Number"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+
+                                <MudItem xs="12">
+                                    <MudTextField T="string"
+                                                  @bind-Value="_settingsModel.LogoPath"
+                                                  Label="Logo Path"
+                                                  Variant="Variant.Outlined"
+                                                  Style="border-radius:4px"
+                                                  FullWidth="true" />
+                                </MudItem>
+                            </MudGrid>
+
+                            <div class="settings-actions settings-actions-right">
+                                <MudButton ButtonType="ButtonType.Submit"
+                                           Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           Style="border-radius:4px"
+                                           Disabled="_isSavingSettings">
+                                    Save Changes
+                                </MudButton>
+                            </div>
+                        </EditForm>
+                    </MudCard>
+                </MudTabPanel>
+
+                <MudTabPanel Text="USER MANAGEMENT">
+                    <div class="settings-section-header">
+                        <div class="settings-section-title">User Management</div>
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Style="border-radius:4px"
+                                   OnClick="OpenAddUserDialog">
+                            Add User
+                        </MudButton>
+                    </div>
+
+                    <MudTable T="User"
+                              Items="_users"
+                              Elevation="0"
+                              Striped="false"
+                              Hover="true"
+                              RowStyle="height:52px"
+                              RowsPerPage="10"
+                              Loading="_isLoadingUsers"
+                              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;">
+                        <HeaderContent>
+                            <MudTh>USERNAME</MudTh>
+                            <MudTh>ROLE</MudTh>
+                            <MudTh>LINKED RESIDENT</MudTh>
+                            <MudTh>ACTIVE</MudTh>
+                            <MudTh>LAST LOGIN</MudTh>
+                            <MudTh>ACTIONS</MudTh>
+                        </HeaderContent>
+
+                        <RowTemplate Context="user">
+                            <MudTd DataLabel="USERNAME" Class="settings-cell-strong">@user.Username</MudTd>
+                            <MudTd DataLabel="ROLE" Class="settings-cell-dark">@(user.Role?.RoleName ?? "-")</MudTd>
+                            <MudTd DataLabel="LINKED RESIDENT" Class="settings-cell-muted">@GetLinkedResidentName(user.Resident)</MudTd>
+                            <MudTd DataLabel="ACTIVE">
+                                <MudChip T="string" Size="Size.Small"
+                                         Style="@GetActiveChipStyle(user.IsActive)">
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="LAST LOGIN" Class="settings-cell-muted">@FormatDateTime(user.LastLoginAt, "Never")</MudTd>
+                            <MudTd DataLabel="ACTIONS">
+                                <div class="settings-inline-actions">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               Style="border-radius:4px; margin-right:4px"
+                                               Disabled="@(!user.IsActive)"
+                                               OnClick="@(() => DeactivateUserAsync(user))">
+                                        Deactivate
+                                    </MudButton>
+
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Default"
+                                               Size="Size.Small"
+                                               Style="border-radius:4px"
+                                               OnClick="@(() => OpenResetPasswordDialog(user))">
+                                        Reset Password
+                                    </MudButton>
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+
+                        <NoRecordsContent>
+                            <div class="settings-empty-state">
+                                <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Class="settings-empty-icon" />
+                                <div class="settings-empty-title">No users found</div>
+                                <div class="settings-empty-message">No user accounts are available yet.</div>
+                            </div>
+                        </NoRecordsContent>
+
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+                        </PagerContent>
+                    </MudTable>
+                </MudTabPanel>
+
+                <MudTabPanel Text="AUDIT LOG">
+                    <MudGrid Spacing="2" Style="margin-bottom:16px;">
+                        <MudItem xs="12" md="3">
+                            <MudTextField T="string"
+                                          Value="_auditUsernameFilter"
+                                          ValueChanged="HandleAuditUsernameChanged"
+                                          Placeholder="Filter by username..."
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.None"
+                                          Style="border-radius:4px;"
+                                          Immediate="true"
+                                          OnKeyUp="HandleAuditFilterKeyUp" />
+                        </MudItem>
+
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="string" @onblur="StateHasChanged"
+                                       Value="_auditActionFilter"
+                                       ValueChanged="HandleAuditActionChanged"
+                                       Placeholder="Filter by action"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius:4px;"
+                                       Clearable="true">
+                                <MudSelectItem Value="@string.Empty">All Actions</MudSelectItem>
+                                <MudSelectItem Value="@("Login")">Login</MudSelectItem>
+                                <MudSelectItem Value="@("Create")">Create</MudSelectItem>
+                                <MudSelectItem Value="@("Update")">Update</MudSelectItem>
+                                <MudSelectItem Value="@("Delete")">Delete</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="string" @onblur="StateHasChanged"
+                                       Value="_auditTableFilter"
+                                       ValueChanged="HandleAuditTableChanged"
+                                       Placeholder="Filter by table"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius:4px;"
+                                       Clearable="true">
+                                <MudSelectItem Value="@string.Empty">All Tables</MudSelectItem>
+                                <MudSelectItem Value="@("Users")">Users</MudSelectItem>
+                                <MudSelectItem Value="@("Residents")">Residents</MudSelectItem>
+                                <MudSelectItem Value="@("Households")">Households</MudSelectItem>
+                                <MudSelectItem Value="@("Events")">Events</MudSelectItem>
+                                <MudSelectItem Value="@("Attendances")">Attendances</MudSelectItem>
+                                <MudSelectItem Value="@("InteractionLogs")">InteractionLogs</MudSelectItem>
+                                <MudSelectItem Value="@("BlotterEntries")">BlotterEntries</MudSelectItem>
+                                <MudSelectItem Value="@("ClearanceRequests")">ClearanceRequests</MudSelectItem>
+                                <MudSelectItem Value="@("BarangaySettings")">BarangaySettings</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" md="3">
+                            <MudDateRangePicker DateRange="_auditDateRange"
+                                                DateRangeChanged="HandleAuditDateRangeChanged"
+                                                Placeholder="Filter by date range"
+                                                Variant="Variant.Outlined"
+                                                Style="border-radius:4px;"
+                                                DateFormat="MMM dd, yyyy" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudTable T="AuditLogModel"
+                              Items="_filteredAuditLogs"
+                              Elevation="0"
+                              Striped="false"
+                              Hover="true"
+                              RowStyle="height:52px"
+                              RowsPerPage="10"
+                              Loading="_isLoadingAuditLogs"
+                              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;">
+                        <HeaderContent>
+                            <MudTh>TIMESTAMP</MudTh>
+                            <MudTh>USERNAME</MudTh>
+                            <MudTh>ACTION</MudTh>
+                            <MudTh>TABLE</MudTh>
+                            <MudTh>RECORD ID</MudTh>
+                            <MudTh>DETAILS</MudTh>
+                        </HeaderContent>
+
+                        <RowTemplate Context="log">
+                            <MudTd DataLabel="TIMESTAMP" Class="settings-cell-muted">@FormatDateTime(log.Timestamp, "-")</MudTd>
+                            <MudTd DataLabel="USERNAME" Class="settings-cell-dark">@(log.User?.Username ?? "-")</MudTd>
+                            <MudTd DataLabel="ACTION" Class="settings-cell-strong">@log.Action</MudTd>
+                            <MudTd DataLabel="TABLE" Class="settings-cell-muted">@log.TableAffected</MudTd>
+                            <MudTd DataLabel="RECORD ID" Class="settings-cell-muted">@(log.RecordId?.ToString() ?? "-")</MudTd>
+                            <MudTd DataLabel="DETAILS" Class="settings-cell-muted">
+                                <div class="settings-truncate" title="@log.Details">@(string.IsNullOrWhiteSpace(log.Details) ? "-" : log.Details)</div>
+                            </MudTd>
+                        </RowTemplate>
+
+                        <NoRecordsContent>
+                            <div class="settings-empty-state">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Class="settings-empty-icon" />
+                                <div class="settings-empty-title">No audit logs found</div>
+                                <div class="settings-empty-message">No audit logs matched the current filters.</div>
+                            </div>
+                        </NoRecordsContent>
+
+                        <PagerContent>
+                            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+                        </PagerContent>
+                    </MudTable>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </div>
+}
+
+<MudDialog @bind-Visible="_addUserDialogOpen"
+           Options="_smallDialogOptions"
+           TitleClass="settings-dialog-title"
+           ContentClass="settings-dialog-content"
+           ActionsClass="settings-dialog-actions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add User</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="_addUserModel">
+            <DataAnnotationsValidator />
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_addUserModel.Username"
+                                  For="@(() => _addUserModel.Username)"
+                                  Label="Username"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_addUserModel.Password"
+                                  For="@(() => _addUserModel.Password)"
+                                  Label="Password"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true"
+                                  InputType="@(_showAddUserPassword ? InputType.Text : InputType.Password)"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showAddUserPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="ToggleAddUserPasswordVisibility" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="int" @onblur="StateHasChanged"
+                               @bind-Value="_addUserModel.RoleId"
+                               For="@(() => _addUserModel.RoleId)"
+                               Label="Role"
+                               Variant="Variant.Outlined"
+                               Style="border-radius:4px"
+                               FullWidth="true">
+                        @foreach (var role in OrderedRoles)
+                        {
+                            <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudAutocomplete T="Resident"
+                                     Label="Linked Resident"
+                                     Variant="Variant.Outlined"
+                                     Style="border-radius:4px"
+                                     FullWidth="true"
+                                     SearchFunc="SearchLinkedResidentsAsync"
+                                     ToStringFunc="FormatResidentFullName"
+                                     Value="_selectedLinkedResident"
+                                     ValueChanged="HandleLinkedResidentChanged"
+                                     ResetValueOnEmptyText="true"
+                                     CoerceText="true"
+                                     Clearable="true" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px"
+                   OnClick="CloseAddUserDialog">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px"
+                   OnClick="SaveNewUserAsync">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_resetPasswordDialogOpen"
+           Options="_extraSmallDialogOptions"
+           TitleClass="settings-dialog-title"
+           ContentClass="settings-dialog-content"
+           ActionsClass="settings-dialog-actions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Reset Password</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string"
+                      @bind-Value="_newPassword"
+                      Label="New Password"
+                      Variant="Variant.Outlined"
+                      Style="border-radius:4px"
+                      FullWidth="true"
+                      InputType="@(_showResetPassword ? InputType.Text : InputType.Password)"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@(_showResetPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                      OnAdornmentClick="ToggleResetPasswordVisibility" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px"
+                   OnClick="CloseResetPasswordDialog">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px"
+                   OnClick="SaveResetPasswordAsync">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly DialogOptions _smallDialogOptions = new()
+    {
+        FullWidth = true,
+        MaxWidth = MaxWidth.Small,
+        CloseOnEscapeKey = true
+    };
+
+    private readonly DialogOptions _extraSmallDialogOptions = new()
+    {
+        FullWidth = true,
+        MaxWidth = MaxWidth.ExtraSmall,
+        CloseOnEscapeKey = true
+    };
+
+    private readonly AddUserModel _addUserModel = new();
+    private BarangaySettings _settingsModel = new() { SettingId = 1 };
+    private List<User> _users = [];
+    private List<Role> _roles = [];
+    private List<AuditLogModel> _auditLogs = [];
+    private List<AuditLogModel> _filteredAuditLogs = [];
+    private bool _isAuthorized = true;
+    private bool _isLoading = true;
+    private bool _isLoadingUsers;
+    private bool _isLoadingAuditLogs;
+    private bool _isSavingSettings;
+    private bool _addUserDialogOpen;
+    private bool _resetPasswordDialogOpen;
+    private bool _showAddUserPassword;
+    private bool _showResetPassword;
+    private Resident? _selectedLinkedResident;
+    private User? _selectedResetUser;
+    private string _newPassword = string.Empty;
+    private string _auditUsernameFilter = string.Empty;
+    private string _auditActionFilter = string.Empty;
+    private string _auditTableFilter = string.Empty;
+    private DateRange _auditDateRange = new(null, null);
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    private IEnumerable<Role> OrderedRoles =>
+        _roles.OrderBy(role => GetRoleOrder(role.RoleName));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase))
+        {
+            _isAuthorized = false;
+            NavigationManager.NavigateTo("/dashboard", false);
+            return;
+        }
+
+        await LoadPageDataAsync();
+    }
+
+    private async Task LoadPageDataAsync()
+    {
+        _isLoading = true;
+
+        var settings = await DbContext.BarangaySettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.SettingId == 1);
+
+        _settingsModel = settings ?? new BarangaySettings { SettingId = 1 };
+
+        _roles = await AuthService.GetAllRolesAsync();
+        if (_roles.Count > 0 && _addUserModel.RoleId <= 0)
+        {
+            _addUserModel.RoleId = OrderedRoles.First().RoleId;
+        }
+
+        await LoadUsersAsync();
+        await LoadAuditLogsAsync();
+
+        _isLoading = false;
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoadingUsers = true;
+        _users = await AuthService.GetAllUsersAsync();
+        _isLoadingUsers = false;
+    }
+
+    private async Task LoadAuditLogsAsync()
+    {
+        _isLoadingAuditLogs = true;
+        _auditLogs = await AuditService.GetAllLogsAsync();
+        ApplyAuditFilters();
+        _isLoadingAuditLogs = false;
+    }
+
+    private void HandleAuditUsernameChanged(string value)
+    {
+        _auditUsernameFilter = value;
+        ApplyAuditFilters();
+    }
+
+    private void HandleAuditActionChanged(string value)
+    {
+        _auditActionFilter = value;
+        ApplyAuditFilters();
+    }
+
+    private void HandleAuditTableChanged(string value)
+    {
+        _auditTableFilter = value;
+        ApplyAuditFilters();
+    }
+
+    private void HandleAuditDateRangeChanged(DateRange range)
+    {
+        _auditDateRange = range;
+        ApplyAuditFilters();
+    }
+
+    private void HandleAuditFilterKeyUp(KeyboardEventArgs _)
+    {
+        ApplyAuditFilters();
+    }
+
+    private void ApplyAuditFilters()
+    {
+        _filteredAuditLogs = _auditLogs
+            .Where(log =>
+            {
+                var logDate = ParseAuditTimestamp(log.Timestamp);
+
+                return (string.IsNullOrEmpty(_auditUsernameFilter) ||
+                        (log.User?.Username?.Contains(_auditUsernameFilter, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+                       (string.IsNullOrEmpty(_auditActionFilter) ||
+                        log.Action == _auditActionFilter) &&
+                       (string.IsNullOrEmpty(_auditTableFilter) ||
+                        log.TableAffected == _auditTableFilter) &&
+                       (!_auditDateRange.Start.HasValue ||
+                        (logDate.HasValue && logDate.Value.Date >= _auditDateRange.Start.Value.Date)) &&
+                       (!_auditDateRange.End.HasValue ||
+                        (logDate.HasValue && logDate.Value.Date <= _auditDateRange.End.Value.Date));
+            })
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (_isSavingSettings)
+        {
+            return;
+        }
+
+        _isSavingSettings = true;
+
+        try
+        {
+            var existingSettings = await DbContext.BarangaySettings
+                .FirstOrDefaultAsync(candidate => candidate.SettingId == 1);
+
+            if (existingSettings is null)
+            {
+                _settingsModel.SettingId = 1;
+                _settingsModel.BarangayName = _settingsModel.BarangayName.Trim();
+                _settingsModel.Municipality = _settingsModel.Municipality.Trim();
+                _settingsModel.Province = _settingsModel.Province.Trim();
+                _settingsModel.CaptainName = NullIfWhiteSpace(_settingsModel.CaptainName);
+                _settingsModel.SecretaryName = NullIfWhiteSpace(_settingsModel.SecretaryName);
+                _settingsModel.ContactNumber = NullIfWhiteSpace(_settingsModel.ContactNumber);
+                _settingsModel.LogoPath = NullIfWhiteSpace(_settingsModel.LogoPath);
+                _settingsModel.UpdatedAt = DateTime.UtcNow.ToString("O");
+                _settingsModel.UpdatedBy = CurrentUserId;
+                DbContext.BarangaySettings.Add(_settingsModel);
+            }
+            else
+            {
+                existingSettings.BarangayName = _settingsModel.BarangayName.Trim();
+                existingSettings.Municipality = _settingsModel.Municipality.Trim();
+                existingSettings.Province = _settingsModel.Province.Trim();
+                existingSettings.CaptainName = NullIfWhiteSpace(_settingsModel.CaptainName);
+                existingSettings.SecretaryName = NullIfWhiteSpace(_settingsModel.SecretaryName);
+                existingSettings.ContactNumber = NullIfWhiteSpace(_settingsModel.ContactNumber);
+                existingSettings.LogoPath = NullIfWhiteSpace(_settingsModel.LogoPath);
+                existingSettings.UpdatedAt = DateTime.UtcNow.ToString("O");
+                existingSettings.UpdatedBy = CurrentUserId;
+            }
+
+            await DbContext.SaveChangesAsync();
+
+            await AuditService.LogAsync(
+                CurrentUserId,
+                "Update Settings",
+                "BarangaySettings",
+                1,
+                "Updated barangay information.");
+
+            Snackbar.Add("Settings saved.", Severity.Success);
+        }
+        finally
+        {
+            _isSavingSettings = false;
+        }
+    }
+
+    private void OpenAddUserDialog()
+    {
+        ResetAddUserForm();
+        _addUserDialogOpen = true;
+    }
+
+    private void CloseAddUserDialog()
+    {
+        _addUserDialogOpen = false;
+    }
+
+    private void ToggleAddUserPasswordVisibility()
+    {
+        _showAddUserPassword = !_showAddUserPassword;
+    }
+
+    private void ToggleResetPasswordVisibility()
+    {
+        _showResetPassword = !_showResetPassword;
+    }
+
+    private async Task<IEnumerable<Resident>> SearchLinkedResidentsAsync(string value, CancellationToken cancellationToken)
+    {
+        return await AuthService.SearchResidentsForLinkAsync(value);
+    }
+
+    private Task HandleLinkedResidentChanged(Resident? resident)
+    {
+        _selectedLinkedResident = resident;
+        _addUserModel.LinkedResidentId = resident?.ResidentId;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveNewUserAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_addUserModel.Username) ||
+            string.IsNullOrWhiteSpace(_addUserModel.Password) ||
+            _addUserModel.RoleId <= 0)
+        {
+            Snackbar.Add("Please complete all required user fields.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            await AuthService.CreateUserAsync(
+                _addUserModel.Username,
+                _addUserModel.Password,
+                _addUserModel.RoleId,
+                _addUserModel.LinkedResidentId,
+                CurrentUserId);
+
+            _addUserDialogOpen = false;
+            Snackbar.Add("User created.", Severity.Success);
+            await LoadUsersAsync();
+            await LoadAuditLogsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeactivateUserAsync(User user)
+    {
+        var success = await AuthService.DeactivateUserAsync(user.UserId, CurrentUserId);
+        if (!success)
+        {
+            Snackbar.Add("User could not be deactivated.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("User deactivated.", Severity.Success);
+        await LoadUsersAsync();
+        await LoadAuditLogsAsync();
+    }
+
+    private void OpenResetPasswordDialog(User user)
+    {
+        _selectedResetUser = user;
+        _newPassword = string.Empty;
+        _showResetPassword = false;
+        _resetPasswordDialogOpen = true;
+    }
+
+    private void CloseResetPasswordDialog()
+    {
+        _resetPasswordDialogOpen = false;
+        _selectedResetUser = null;
+        _newPassword = string.Empty;
+    }
+
+    private async Task SaveResetPasswordAsync()
+    {
+        if (_selectedResetUser is null || string.IsNullOrWhiteSpace(_newPassword))
+        {
+            Snackbar.Add("Please enter a new password.", Severity.Error);
+            return;
+        }
+
+        var success = await AuthService.ResetPasswordAsync(_selectedResetUser.UserId, _newPassword, CurrentUserId);
+        if (!success)
+        {
+            Snackbar.Add("Password could not be updated.", Severity.Error);
+            return;
+        }
+
+        _resetPasswordDialogOpen = false;
+        Snackbar.Add("Password updated.", Severity.Success);
+        await LoadUsersAsync();
+        await LoadAuditLogsAsync();
+        _selectedResetUser = null;
+        _newPassword = string.Empty;
+    }
+
+    private void ResetAddUserForm()
+    {
+        _addUserModel.Username = string.Empty;
+        _addUserModel.Password = string.Empty;
+        _addUserModel.LinkedResidentId = null;
+        _addUserModel.RoleId = OrderedRoles.FirstOrDefault()?.RoleId ?? 0;
+        _selectedLinkedResident = null;
+        _showAddUserPassword = false;
+    }
+
+    private static string GetLinkedResidentName(Resident? resident)
+    {
+        return resident is null ? "-" : FormatResidentFullName(resident);
+    }
+
+    private static string FormatResidentFullName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatDateTime(string? value, string fallback)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMM dd, yyyy hh:mm tt")
+            : fallback;
+    }
+
+    private static DateTime? ParseAuditTimestamp(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static string GetActiveChipStyle(bool isActive)
+    {
+        return isActive
+            ? "background:#22C55E;color:#FFFFFF;border-radius:4px;box-shadow:none;"
+            : "background:#94A3B8;color:#FFFFFF;border-radius:4px;box-shadow:none;";
+    }
+
+    private static int GetRoleOrder(string? roleName)
+    {
+        return roleName?.Trim() switch
+        {
+            "Captain" => 0,
+            "Kagawad" => 1,
+            "Staff" => 2,
+            "Resident" => 3,
+            _ => 99
+        };
+    }
+
+    private static string? NullIfWhiteSpace(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private sealed class AddUserModel
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Range(1, int.MaxValue)]
+        public int RoleId { get; set; }
+
+        public int? LinkedResidentId { get; set; }
+    }
+}
+
+<style>
+    .settings-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .settings-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .settings-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .settings-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+    }
+
+    .settings-tabs .mud-tab {
+        color: #64748B !important;
+        font-weight: 600;
+    }
+
+    .settings-tabs .mud-tab.mud-tab-active {
+        color: #3B5BDB !important;
+    }
+
+    .settings-tabs .mud-tab-slider,
+    .settings-tabs .mud-tabs-slider {
+        background: #3B5BDB !important;
+    }
+
+    .settings-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .settings-section-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .settings-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 24px;
+    }
+
+    .settings-actions-right {
+        justify-content: flex-end;
+    }
+
+    .settings-filter-grid {
+        align-items: end;
+        margin-bottom: 16px;
+    }
+
+    .settings-cell-dark {
+        color: #1E293B;
+    }
+
+    .settings-cell-muted {
+        color: #64748B;
+    }
+
+    .settings-cell-strong {
+        color: #1E293B;
+        font-weight: 500;
+    }
+
+    .settings-inline-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .settings-truncate {
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .settings-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 220px;
+        padding: 32px 16px;
+        text-align: center;
+    }
+
+    .settings-empty-icon {
+        font-size: 48px;
+        color: #94A3B8;
+    }
+
+    .settings-empty-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .settings-empty-message {
+        color: #64748B;
+        font-size: 0.95rem;
+    }
+</style>

@@ -1,0 +1,204 @@
+@page "/reports"
+@using Microsoft.JSInterop
+@inject ReportService ReportService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Reports &amp; Exports</PageTitle>
+
+<div class="reports-page">
+    <div class="reports-header">
+        <h1 class="reports-title">Reports &amp; Exports</h1>
+    </div>
+
+    <MudCard Elevation="0"
+             Class="reports-card"
+             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+        <div class="reports-card-title">Resident Report</div>
+        <div class="reports-card-description">Export full resident list with status, household, purok, and category data.</div>
+
+        <div class="reports-actions">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Style="border-radius:4px; margin-right:8px"
+                       Disabled="@IsExporting"
+                       OnClick="@(() => ExportAsync(
+                           exportKey: "residents-pdf",
+                           exportFunc: () => ReportService.ExportResidentsToPdfAsync(),
+                           fileName: $"residents_{DateTime.Today:yyyy-MM-dd}.pdf"))">
+                @if (IsExportingKey("residents-pdf"))
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="reports-button-spinner" />
+                }
+                else
+                {
+                    <span>Export to PDF</span>
+                }
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Style="border-radius:4px"
+                       Disabled="@IsExporting"
+                       OnClick="@(() => ExportAsync(
+                           exportKey: "residents-excel",
+                           exportFunc: () => ReportService.ExportResidentsToExcelAsync(),
+                           fileName: $"residents_{DateTime.Today:yyyy-MM-dd}.xlsx"))">
+                @if (IsExportingKey("residents-excel"))
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="reports-button-spinner" />
+                }
+                else
+                {
+                    <span>Export to Excel</span>
+                }
+            </MudButton>
+        </div>
+    </MudCard>
+
+    <MudCard Elevation="0"
+             Class="reports-card"
+             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+        <div class="reports-card-title">Blotter Summary Report</div>
+        <div class="reports-card-description">Export all blotter entries with status and incident details.</div>
+
+        <div class="reports-actions">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Style="border-radius:4px"
+                       Disabled="@IsExporting"
+                       OnClick="@(() => ExportAsync(
+                           exportKey: "blotter-excel",
+                           exportFunc: () => ReportService.ExportBlotterToExcelAsync(),
+                           fileName: $"blotter_{DateTime.Today:yyyy-MM-dd}.xlsx"))">
+                @if (IsExportingKey("blotter-excel"))
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="reports-button-spinner" />
+                }
+                else
+                {
+                    <span>Export to Excel</span>
+                }
+            </MudButton>
+        </div>
+    </MudCard>
+
+    <MudCard Elevation="0"
+             Class="reports-card"
+             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+        <div class="reports-card-title">Clearance Report</div>
+        <div class="reports-card-description">Export all clearance requests with status, purpose, and processing details.</div>
+
+        <div class="reports-actions">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Style="border-radius:4px"
+                       Disabled="@IsExporting"
+                       OnClick="@(() => ExportAsync(
+                           exportKey: "clearance-excel",
+                           exportFunc: () => ReportService.ExportClearanceToExcelAsync(),
+                           fileName: $"clearance_{DateTime.Today:yyyy-MM-dd}.xlsx"))">
+                @if (IsExportingKey("clearance-excel"))
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="reports-button-spinner" />
+                }
+                else
+                {
+                    <span>Export to Excel</span>
+                }
+            </MudButton>
+        </div>
+    </MudCard>
+</div>
+
+@code {
+    private string? _activeExportKey;
+
+    private bool IsExporting => !string.IsNullOrWhiteSpace(_activeExportKey);
+
+    private bool IsExportingKey(string exportKey) =>
+        string.Equals(_activeExportKey, exportKey, StringComparison.Ordinal);
+
+    private async Task ExportAsync(string exportKey, Func<Task<byte[]>> exportFunc, string fileName)
+    {
+        if (IsExporting)
+        {
+            return;
+        }
+
+        _activeExportKey = exportKey;
+
+        try
+        {
+            var bytes = await exportFunc();
+            await JS.InvokeVoidAsync(
+                "downloadFile",
+                fileName,
+                "application/octet-stream",
+                Convert.ToBase64String(bytes));
+
+            Snackbar.Add("Report exported successfully.", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Export failed. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _activeExportKey = null;
+        }
+    }
+}
+
+<style>
+    .reports-page {
+        display: flex;
+        flex-direction: column;
+        background: #F8F9FA;
+    }
+
+    .reports-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .reports-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .reports-card {
+        background: #FFFFFF;
+    }
+
+    .reports-card-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .reports-card-description {
+        color: #64748B;
+        font-size: 0.875rem;
+        margin-bottom: 16px;
+    }
+
+    .reports-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .reports-button-spinner {
+        margin: 0 6px;
+    }
+</style>

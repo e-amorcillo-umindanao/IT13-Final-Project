@@ -1,0 +1,224 @@
+@inject ClearanceService ClearanceService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_request is null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Clearance request not found.</MudAlert>
+        }
+        else
+        {
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="detail-label">Resident</div>
+                    <div class="detail-value">@GetResidentName(_request.Resident)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Purpose</div>
+                    <div class="detail-value">@_request.Purpose</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Requested At</div>
+                    <div class="detail-value">@FormatDate(_request.RequestedAt)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">@_request.Status</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Valid Until</div>
+                    <div class="detail-value">@FormatDate(_request.ValidUntil)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Processed By</div>
+                    <div class="detail-value">@(_request.ProcessedByUser?.Username ?? "-")</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Remarks</div>
+                    <div class="detail-value">@(string.IsNullOrWhiteSpace(_request.Remarks) ? "-" : _request.Remarks)</div>
+                </div>
+            </div>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        @if (_request is not null && _request.Status == "Pending" && CanProcess)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="OpenRejectDialogAsync">Reject</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenApproveDialogAsync">Approve</MudButton>
+        }
+        @if (_request is not null && _request.Status == "Approved")
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="PrintClearancePdfAsync">Print Clearance PDF</MudButton>
+        }
+        <MudButton Variant="Variant.Text" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int ClearanceId { get; set; }
+
+    private ClearanceRequest? _request;
+    private BarangaySettings? _settings;
+    private bool _isLoading = true;
+
+    private bool CanProcess =>
+        string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(AuthService.GetCurrentRole(), "Kagawad", StringComparison.OrdinalIgnoreCase);
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _request = await ClearanceService.GetClearanceByIdAsync(ClearanceId);
+        _settings = await DbContext.BarangaySettings.AsNoTracking().FirstOrDefaultAsync(settings => settings.SettingId == 1);
+        _isLoading = false;
+    }
+
+    private async Task OpenApproveDialogAsync()
+    {
+        if (_request is null)
+        {
+            return;
+        }
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ApproveClearanceDialog>("Approve Clearance", options);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled || result.Data is not ApproveClearanceDialog.ApproveDialogModel model || !model.ValidUntil.HasValue)
+        {
+            return;
+        }
+
+        var approved = await ClearanceService.ApproveClearanceAsync(_request.ClearanceId, CurrentUserId, model.ValidUntil.Value, model.Remarks);
+        if (!approved)
+        {
+            Snackbar.Add("Clearance request could not be approved.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Clearance request approved.", Severity.Success);
+        await LoadAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private async Task OpenRejectDialogAsync()
+    {
+        if (_request is null)
+        {
+            return;
+        }
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<RejectClearanceDialog>("Reject Clearance", options);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled || result.Data is not string remarks)
+        {
+            return;
+        }
+
+        var rejected = await ClearanceService.RejectClearanceAsync(_request.ClearanceId, CurrentUserId, remarks);
+        if (!rejected)
+        {
+            Snackbar.Add("Clearance request could not be rejected.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Clearance request rejected.", Severity.Success);
+        await LoadAsync();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private async Task PrintClearancePdfAsync()
+    {
+        if (_request?.Resident is null || _settings is null)
+        {
+            Snackbar.Add("Clearance PDF could not be generated.", Severity.Error);
+            return;
+        }
+
+        var pdfBytes = await PdfExportHelper.GenerateClearancePdfAsync(_request, _request.Resident, _settings);
+        var picker = new Windows.Storage.Pickers.FileSavePicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = $"Clearance-{_request.ClearanceId}"
+        };
+
+        picker.FileTypeChoices.Add("PDF Document", [".pdf"]);
+
+        var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+        var platformWindow = mauiWindow?.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+        if (platformWindow is null)
+        {
+            Snackbar.Add("Save dialog is not available right now.", Severity.Error);
+            return;
+        }
+
+        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(platformWindow);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+
+        var file = await picker.PickSaveFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        await Windows.Storage.FileIO.WriteBytesAsync(file, pdfBytes);
+        Snackbar.Add("Clearance PDF saved.", Severity.Success);
+    }
+
+    private void Close()
+    {
+        MudDialog.Cancel();
+    }
+
+    private static string GetResidentName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return "-";
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy")
+            : "-";
+    }
+}

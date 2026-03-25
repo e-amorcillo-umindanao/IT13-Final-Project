@@ -1,0 +1,162 @@
+@page "/events/{Id:int}/attendance"
+@inject EventService EventService
+@inject ResidentService ResidentService
+@inject AttendanceService AttendanceService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Record Attendance</PageTitle>
+
+<div class="page-shell">
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_event is null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Event not found.</MudAlert>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">Record Attendance</h1>
+        </div>
+
+        <MudPaper Class="page-card section-card" Elevation="0">
+            <MudText Typo="Typo.h6">@_event.Title</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@FormatDateTime(_event.EventDate)</MudText>
+        </MudPaper>
+
+        <MudPaper Class="page-card" Elevation="0">
+            <MudTable T="Resident"
+                      Items="_residents"
+                      Hover="true"
+                      Dense="true"
+                      Bordered="true"
+                      Striped="false">
+                <HeaderContent>
+                    <MudTh>Resident Name</MudTh>
+                    <MudTh>Purok</MudTh>
+                    <MudTh>Status</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="resident">
+                    <MudTd DataLabel="Resident Name">@GetResidentName(resident)</MudTd>
+                    <MudTd DataLabel="Purok">@(resident.Purok?.Name ?? "-")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   Value="@GetResidentStatus(resident.ResidentId)"
+                                   ValueChanged="@((string value) => SetResidentStatus(resident.ResidentId, value))"
+                                   Variant="Variant.Outlined"
+                                   Dense="true">
+                            @foreach (var status in AttendanceStatuses)
+                            {
+                                <MudSelectItem Value="@status">@status</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <div class="form-actions">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           OnClick="HandleCancel">
+                    Cancel
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="_isSaving"
+                           OnClick="HandleSaveAllAsync">
+                    Save All Attendance
+                </MudButton>
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private static readonly string[] AttendanceStatuses = ["Present", "Absent", "Excused"];
+
+    private Event? _event;
+    private List<Resident> _residents = [];
+    private Dictionary<int, string> _residentStatuses = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        _isLoading = true;
+        _event = await EventService.GetEventByIdAsync(Id);
+
+        if (_event is not null)
+        {
+            _residents = await ResidentService.SearchResidentsAsync(null, "Active", null, null, null);
+            var existingRecords = await AttendanceService.GetAttendanceByEventAsync(Id);
+            _residentStatuses = _residents.ToDictionary(
+                resident => resident.ResidentId,
+                resident => existingRecords.FirstOrDefault(record => record.ResidentId == resident.ResidentId)?.Status ?? "Absent");
+        }
+
+        _isLoading = false;
+    }
+
+    private string GetResidentStatus(int residentId)
+    {
+        return _residentStatuses.TryGetValue(residentId, out var status) ? status : "Absent";
+    }
+
+    private void SetResidentStatus(int residentId, string status)
+    {
+        _residentStatuses[residentId] = status;
+    }
+
+    private async Task HandleSaveAllAsync()
+    {
+        if (_event is null || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var records = _residentStatuses
+            .Select(entry => (residentId: entry.Key, status: entry.Value))
+            .ToList();
+
+        await AttendanceService.BulkRecordAttendanceAsync(_event.EventId, records, CurrentUserId);
+        Snackbar.Add("Attendance saved.", Severity.Success);
+        _isSaving = false;
+        NavigationManager.NavigateTo($"/events/{_event.EventId}");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo($"/events/{Id}");
+    }
+
+    private static string GetResidentName(Resident resident)
+    {
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatDateTime(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy h:mm tt")
+            : "-";
+    }
+}

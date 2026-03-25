@@ -1,0 +1,198 @@
+@page "/engagement/log/{ResidentId:int}"
+@inject ResidentService ResidentService
+@inject InteractionService InteractionService
+@inject EngagementService EngagementService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Log Interaction</PageTitle>
+
+<div class="page-shell">
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_resident is null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Resident not found.</MudAlert>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">Log Interaction</h1>
+        </div>
+
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 16px; margin-bottom: 16px;">
+            <MudText Typo="Typo.h6" Style="color: #1E293B; font-weight: 600;">
+                @ResidentName
+            </MudText>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Style="@GetEngagementChipStyle(_engagementScore)">
+                    @GetEngagementLabel(_engagementScore)
+                </MudChip>
+                <MudText Style="color: #64748B; font-size: 0.875rem;">
+                    @_engagementScore / 100
+                </MudText>
+            </div>
+        </MudPaper>
+
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 24px; margin-top: 16px;">
+            <EditForm Model="_model" OnValidSubmit="HandleSaveAsync">
+                <DataAnnotationsValidator />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.InteractionType"
+                                   For="@(() => _model.InteractionType)"
+                                   Label="Interaction Type*"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px;"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@("Visit")">Visit</MudSelectItem>
+                            <MudSelectItem Value="@("Call")">Call</MudSelectItem>
+                            <MudSelectItem Value="@("Follow-up")">Follow-up</MudSelectItem>
+                            <MudSelectItem Value="@("Message")">Message</MudSelectItem>
+                            <MudSelectItem Value="@("Meeting")">Meeting</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker @bind-Date="_model.InteractionDate"
+                                       For="@(() => _model.InteractionDate)"
+                                       Label="Interaction Date*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px; width: 100%;"
+                                       DateFormat="MMMM dd, yyyy"
+                                       Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Notes"
+                                      For="@(() => _model.Notes)"
+                                      Label="Notes*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true"
+                                      Lines="5" />
+                    </MudItem>
+                </MudGrid>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-radius: 4px;"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px;"
+                               Disabled="_isSaving">
+                        Save
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int ResidentId { get; set; }
+
+    private static readonly string[] InteractionTypes = ["Visit", "Call", "Follow-up", "Message", "Meeting"];
+
+    private readonly InteractionFormModel _model = new()
+    {
+        InteractionDate = DateTime.Today
+    };
+
+    private Resident? _resident;
+    private int _engagementScore;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+    private string ResidentName => _resident is null
+        ? "Resident"
+        : string.Join(" ", new[] { _resident.FirstName, _resident.MiddleName, _resident.LastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _resident = await ResidentService.GetResidentByIdAsync(ResidentId);
+
+        if (_resident is not null)
+        {
+            _engagementScore = await EngagementService.GetEngagementScoreAsync(ResidentId);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_resident is null || _isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var interaction = new InteractionLog
+        {
+            ResidentId = ResidentId,
+            InteractionType = _model.InteractionType,
+            InteractionDate = _model.InteractionDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            Notes = _model.Notes
+        };
+
+        await InteractionService.CreateInteractionAsync(interaction, CurrentUserId);
+        Snackbar.Add("Interaction logged.", Severity.Success);
+        _isSaving = false;
+        NavigationManager.NavigateTo($"/residents/{ResidentId}");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo($"/residents/{ResidentId}");
+    }
+
+    private static string GetEngagementLabel(int score)
+    {
+        return score switch
+        {
+            >= 75 => "High",
+            >= 40 => "Medium",
+            _ => "Low"
+        };
+    }
+
+    private static string GetEngagementChipStyle(int score)
+    {
+        return score switch
+        {
+            >= 75 => "background-color: #22C55E; color: white; border-radius: 4px !important; font-size: 0.75rem;",
+            >= 40 => "background-color: #F59E0B; color: white; border-radius: 4px !important; font-size: 0.75rem;",
+            _ => "background-color: #EF4444; color: white; border-radius: 4px !important; font-size: 0.75rem;"
+        };
+    }
+
+    private sealed class InteractionFormModel
+    {
+        [Required]
+        public string InteractionType { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime? InteractionDate { get; set; }
+
+        [Required]
+        public string Notes { get; set; } = string.Empty;
+    }
+}

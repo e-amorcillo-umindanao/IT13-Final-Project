@@ -1,0 +1,61 @@
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12">
+                <MudDatePicker @bind-Date="_model.ValidUntil"
+                               Label="Valid Until"
+                               Variant="Variant.Outlined"
+                               DateFormat="yyyy-MM-dd"
+                               Editable="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string"
+                              @bind-Value="_model.Remarks"
+                              Label="Remarks"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Lines="4" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!_model.ValidUntil.HasValue)"
+                   OnClick="Confirm">
+            Approve
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private readonly ApproveDialogModel _model = new()
+    {
+        ValidUntil = DateTime.Today.AddMonths(6)
+    };
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Confirm()
+    {
+        if (_model.ValidUntil.HasValue)
+        {
+            MudDialog.Close(DialogResult.Ok((object)_model));
+        }
+    }
+
+    public sealed class ApproveDialogModel
+    {
+        public DateTime? ValidUntil { get; set; }
+
+        public string? Remarks { get; set; }
+    }
+}

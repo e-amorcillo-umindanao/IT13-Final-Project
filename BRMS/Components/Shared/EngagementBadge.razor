@@ -1,0 +1,21 @@
+<MudChip T="string"
+         Size="Size.Small"
+         Variant="Variant.Filled"
+         Style="@($"background:{BackgroundColor};color:#FFFFFF;font-weight:700;border-radius:4px !important;")">
+    @Label
+</MudChip>
+
+@code {
+    [Parameter]
+    public int Score { get; set; }
+
+    private string Label =>
+        Score >= 75 ? "High" :
+        Score >= 40 ? "Medium" :
+        "Low";
+
+    private string BackgroundColor =>
+        Score >= 75 ? "#22C55E" :
+        Score >= 40 ? "#F59E0B" :
+        "#EF4444";
+}

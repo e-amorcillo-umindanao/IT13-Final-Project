@@ -1,0 +1,173 @@
+@inject AuthService AuthService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div class="section-card">
+    <div class="section-header">
+        <h2 class="section-title">User Management</h2>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddUserDialogAsync">
+            Add User
+        </MudButton>
+    </div>
+
+    <MudTable T="User"
+              Items="_users"
+              Hover="true"
+              Dense="true"
+              Bordered="true"
+              Striped="false"
+              RowsPerPage="10"
+              Loading="_isLoading">
+        <HeaderContent>
+            <MudTh>Username</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh>Linked Resident</MudTh>
+            <MudTh>Active</MudTh>
+            <MudTh>Last Login</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="user">
+            <MudTd DataLabel="Username">@user.Username</MudTd>
+            <MudTd DataLabel="Role">@(user.Role?.RoleName ?? "-")</MudTd>
+            <MudTd DataLabel="Linked Resident">@GetResidentName(user.Resident)</MudTd>
+            <MudTd DataLabel="Active">
+                <MudChip T="string" Variant="Variant.Filled" Color="@(user.IsActive ? Color.Success : Color.Default)">
+                    @(user.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Last Login">@FormatDateTime(user.LastLoginAt)</MudTd>
+            <MudTd DataLabel="Actions">
+                <div class="table-actions">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               Disabled="@(!user.IsActive || user.UserId == CurrentUserId)"
+                               OnClick="@(() => DeactivateUserAsync(user))">
+                        Deactivate
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               OnClick="@(() => OpenResetPasswordDialogAsync(user))">
+                        Reset Password
+                    </MudButton>
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Outlined.PeopleOutline"
+                        Title="No users found"
+                        Message="Add a user account to manage access roles in BRMS." />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="_pageSizeOptions" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private static readonly int[] _pageSizeOptions = [10, 25, 50];
+
+    private List<User> _users = [];
+    private bool _isLoading = true;
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+        _users = await AuthService.GetAllUsersAsync();
+        _isLoading = false;
+    }
+
+    private async Task OpenAddUserDialogAsync()
+    {
+        var dialog = await DialogService.ShowAsync<AddUserDialog>(
+            "Add User",
+            new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small, CloseOnEscapeKey = true });
+
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not AddUserDialog.AddUserDialogModel model)
+        {
+            return;
+        }
+
+        try
+        {
+            await AuthService.CreateUserAsync(model.Username, model.Password, model.RoleId, model.LinkedResidentId, CurrentUserId);
+            Snackbar.Add("User created.", Severity.Success);
+            await LoadUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeactivateUserAsync(User user)
+    {
+        var deactivated = await AuthService.DeactivateUserAsync(user.UserId, CurrentUserId);
+        if (!deactivated)
+        {
+            Snackbar.Add("User could not be deactivated.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("User deactivated.", Severity.Success);
+        await LoadUsersAsync();
+    }
+
+    private async Task OpenResetPasswordDialogAsync(User user)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ResetPasswordDialog.Username)] = user.Username
+        };
+
+        var dialog = await DialogService.ShowAsync<ResetPasswordDialog>(
+            "Reset Password",
+            parameters,
+            new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.ExtraSmall, CloseOnEscapeKey = true });
+
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not string password)
+        {
+            return;
+        }
+
+        var reset = await AuthService.ResetPasswordAsync(user.UserId, password, CurrentUserId);
+        if (!reset)
+        {
+            Snackbar.Add("Password could not be reset.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Password reset.", Severity.Success);
+        await LoadUsersAsync();
+    }
+
+    private static string GetResidentName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return "-";
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string FormatDateTime(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy h:mm tt")
+            : "-";
+    }
+}

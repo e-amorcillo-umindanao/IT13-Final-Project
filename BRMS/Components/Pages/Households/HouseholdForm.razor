@@ -1,0 +1,225 @@
+@page "/households/new"
+@page "/households/edit/{Id:int}"
+@inject HouseholdService HouseholdService
+@inject ResidentService ResidentService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="page-shell">
+    <div class="page-header">
+        <h1 class="page-title">@PageTitleText</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 24px; margin-top: 16px;">
+            <EditForm Model="_model" OnValidSubmit="HandleSaveAsync">
+                <DataAnnotationsValidator />
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+                    Household Information
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.HouseholdNumber"
+                                      For="@(() => _model.HouseholdNumber)"
+                                      Label="Household Number*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Address"
+                                      For="@(() => _model.Address)"
+                                      Label="Address*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int?" @onblur="StateHasChanged"
+                                   @bind-Value="_model.PurokId"
+                                   Label="Purok"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@((int?)null)">None</MudSelectItem>
+                            @foreach (var purok in _puroks)
+                            {
+                                <MudSelectItem Value="@((int?)purok.PurokId)">@purok.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int?" @onblur="StateHasChanged"
+                                   @bind-Value="_model.HeadResidentId"
+                                   Label="Head Resident"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@((int?)null)">None</MudSelectItem>
+                            @foreach (var resident in _residents)
+                            {
+                                <MudSelectItem Value="@((int?)resident.ResidentId)">
+                                    @($"{resident.FirstName} {resident.LastName}")
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-radius: 4px;"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px;"
+                               Disabled="_isSaving">
+                        Save
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private readonly HouseholdFormModel _model = new();
+    private List<Purok> _puroks = [];
+    private List<Resident> _residents = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _loadError;
+
+    private bool IsEditMode => Id.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit Household" : "Add Household";
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _puroks = await DbContext.Puroks
+                .AsNoTracking()
+                .OrderBy(purok => purok.Name)
+                .ToListAsync();
+
+            _residents = await ResidentService.GetActiveResidentsAsync();
+
+            if (IsEditMode)
+            {
+                await LoadHouseholdAsync(Id!.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to load household form: {ex.Message}";
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadHouseholdAsync(int id)
+    {
+        var household = await HouseholdService.GetHouseholdByIdAsync(id);
+        if (household is null)
+        {
+            _loadError = "Household not found.";
+            return;
+        }
+
+        _model.HouseholdId = household.HouseholdId;
+        _model.HouseholdNumber = household.HouseholdNumber;
+        _model.Address = household.Address;
+        _model.PurokId = household.PurokId;
+        _model.HeadResidentId = household.HeadResidentId;
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var household = new Household
+        {
+            HouseholdId = _model.HouseholdId,
+            HouseholdNumber = _model.HouseholdNumber,
+            Address = _model.Address,
+            PurokId = _model.PurokId,
+            HeadResidentId = _model.HeadResidentId
+        };
+
+        if (IsEditMode)
+        {
+            var updated = await HouseholdService.UpdateHouseholdAsync(household);
+            if (!updated)
+            {
+                Snackbar.Add("Household could not be updated.", Severity.Error);
+                _isSaving = false;
+                return;
+            }
+
+            Snackbar.Add("Household updated.", Severity.Success);
+        }
+        else
+        {
+            await HouseholdService.CreateHouseholdAsync(household, CurrentUserId);
+            Snackbar.Add("Household created.", Severity.Success);
+        }
+
+        _isSaving = false;
+        NavigationManager.NavigateTo("/households");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/households");
+    }
+
+    private sealed class HouseholdFormModel
+    {
+        public int HouseholdId { get; set; }
+
+        [Required]
+        public string HouseholdNumber { get; set; } = string.Empty;
+
+        [Required]
+        public string Address { get; set; } = string.Empty;
+
+        public int? PurokId { get; set; }
+
+        public int? HeadResidentId { get; set; }
+    }
+}

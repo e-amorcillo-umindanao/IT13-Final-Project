@@ -1,0 +1,301 @@
+﻿@page "/blotter"
+@inject BlotterService BlotterService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Blotter Records</PageTitle>
+
+<div class="blotter-page">
+    <div class="blotter-header">
+        <h1 class="blotter-title">Blotter Records</h1>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px;box-shadow:none;"
+                   OnClick="@(() => NavigationManager.NavigateTo("/blotter/new"))">
+            File New Blotter
+        </MudButton>
+    </div>
+
+    <MudGrid Spacing="2" Class="blotter-filter-grid">
+        <MudItem xs="12" md="6">
+            <MudTextField T="string"
+                          Value="_keyword"
+                          ValueChanged="HandleKeywordChangedAsync"
+                          Placeholder="Search by blotter no., complainant, or respondent..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="border-radius:4px"
+                          FullWidth="true"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedStatus"
+                       ValueChanged="HandleStatusChangedAsync"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px"
+                       Label="Status"
+                       FullWidth="true">
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedIncidentType"
+                       ValueChanged="HandleIncidentTypeChangedAsync"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px"
+                       Label="Incident Type"
+                       FullWidth="true">
+                @foreach (var incidentType in IncidentTypeOptions)
+                {
+                    <MudSelectItem Value="@incidentType">@incidentType</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="BlotterEntry"
+              Items="_entries"
+              Elevation="0"
+              Striped="false"
+              Hover="true"
+              RowStyle="height:52px"
+              RowsPerPage="10"
+              Loading="_isLoading"
+              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+              Class="blotter-table">
+        <HeaderContent>
+            <MudTh>BLOTTER NO.</MudTh>
+            <MudTh>COMPLAINANT</MudTh>
+            <MudTh>RESPONDENT</MudTh>
+            <MudTh>TYPE</MudTh>
+            <MudTh>INCIDENT DATE</MudTh>
+            <MudTh>STATUS</MudTh>
+            <MudTh>ACTIONS</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="entry">
+            <MudTd DataLabel="BLOTTER NO." Class="blotter-number-cell">@entry.BlotterNumber</MudTd>
+            <MudTd DataLabel="COMPLAINANT" Class="blotter-cell-primary">@entry.ComplainantName</MudTd>
+            <MudTd DataLabel="RESPONDENT" Class="blotter-cell-primary">@entry.RespondentName</MudTd>
+            <MudTd DataLabel="TYPE" Class="blotter-cell-primary">@entry.IncidentType</MudTd>
+            <MudTd DataLabel="INCIDENT DATE" Class="blotter-cell-muted">@FormatDate(entry.IncidentDate)</MudTd>
+            <MudTd DataLabel="STATUS">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Filled"
+                         Style="@GetStatusChipStyle(entry.Status)"
+                         Class="blotter-status-chip">
+                    @entry.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="ACTIONS">
+                <div class="blotter-actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#64748B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/blotter/{entry.BlotterEntryId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#64748B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/blotter/edit/{entry.BlotterEntryId}"))" />
+                </div>
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <div class="blotter-empty-state">
+                <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Large" Class="blotter-empty-icon" />
+                <div class="blotter-empty-title">No blotter records found</div>
+                <div class="blotter-empty-message">No blotter records matched the current filters.</div>
+            </div>
+        </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private static readonly string[] StatusOptions =
+    [
+        "All",
+        "Open",
+        "Under Investigation",
+        "Resolved",
+        "Closed"
+    ];
+
+    private static readonly string[] IncidentTypeOptions =
+    [
+        "All",
+        "Dispute",
+        "Noise",
+        "Physical Altercation",
+        "Theft",
+        "Other"
+    ];
+
+    private List<BlotterEntry> _entries = [];
+    private bool _isLoading = true;
+    private string _keyword = string.Empty;
+    private string _selectedStatus = "All";
+    private string _selectedIncidentType = "All";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntriesAsync();
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        _isLoading = true;
+        _entries = await BlotterService.GetAllBlotterEntriesAsync();
+        _isLoading = false;
+    }
+
+    private async Task SearchEntriesAsync()
+    {
+        _isLoading = true;
+        _entries = await BlotterService.SearchBlotterAsync(
+            _keyword,
+            NormalizeFilter(_selectedStatus),
+            NormalizeFilter(_selectedIncidentType));
+        _isLoading = false;
+    }
+
+    private async Task HandleKeywordChangedAsync(string value)
+    {
+        _keyword = value;
+        await SearchEntriesAsync();
+    }
+
+    private async Task HandleStatusChangedAsync(string value)
+    {
+        _selectedStatus = value;
+        await SearchEntriesAsync();
+    }
+
+    private async Task HandleIncidentTypeChangedAsync(string value)
+    {
+        _selectedIncidentType = value;
+        await SearchEntriesAsync();
+    }
+
+    private static string? NormalizeFilter(string value)
+    {
+        return string.Equals(value, "All", StringComparison.OrdinalIgnoreCase) ? null : value;
+    }
+
+    private static string FormatDate(string value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMM dd, yyyy")
+            : "-";
+    }
+
+    private static string GetStatusChipStyle(string? status)
+    {
+        return status?.Trim() switch
+        {
+            "Open" => "background:#EF4444;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            "Under Investigation" => "background:#F59E0B;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            "Resolved" => "background:#22C55E;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            "Closed" => "background:#94A3B8;color:#FFFFFF;border-radius:4px;box-shadow:none;",
+            _ => "background:#94A3B8;color:#FFFFFF;border-radius:4px;box-shadow:none;"
+        };
+    }
+}
+
+<style>
+    .blotter-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .blotter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .blotter-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .blotter-filter-grid {
+        align-items: end;
+    }
+
+    .blotter-table {
+        overflow: hidden;
+    }
+
+    .blotter-number-cell {
+        color: #1E293B;
+        font-weight: 500;
+    }
+
+    .blotter-cell-primary {
+        color: #1E293B;
+    }
+
+    .blotter-cell-muted {
+        color: #64748B;
+    }
+
+    .blotter-status-chip {
+        font-weight: 600;
+    }
+
+    .blotter-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .blotter-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 220px;
+        padding: 32px 16px;
+        text-align: center;
+    }
+
+    .blotter-empty-icon {
+        font-size: 48px;
+        color: #94A3B8;
+    }
+
+    .blotter-empty-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .blotter-empty-message {
+        color: #64748B;
+        font-size: 0.95rem;
+    }
+</style>

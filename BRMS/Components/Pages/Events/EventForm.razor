@@ -1,0 +1,254 @@
+@page "/events/new"
+@page "/events/edit/{Id:int}"
+@inject EventService EventService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="page-shell">
+    <div class="page-header">
+        <h1 class="page-title">@PageTitleText</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 24px; margin-top: 16px;">
+            <EditForm Model="_model" OnValidSubmit="HandleSaveAsync">
+                <DataAnnotationsValidator />
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+                    Event Details
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="3">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Title"
+                                      For="@(() => _model.Title)"
+                                      Label="Title*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudDatePicker @bind-Date="_model.EventDate"
+                                       For="@(() => _model.EventDate)"
+                                       Label="Event Date*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px; width: 100%;"
+                                       DateFormat="MMMM dd, yyyy"
+                                       Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudTimePicker @bind-Time="_model.EventTime"
+                                       Label="Event Time*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px;"
+                                       AmPm="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.EventType"
+                                   For="@(() => _model.EventType)"
+                                   Label="Event Type*"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px;"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@("Assembly")">Assembly</MudSelectItem>
+                            <MudSelectItem Value="@("Livelihood")">Livelihood</MudSelectItem>
+                            <MudSelectItem Value="@("Health")">Health</MudSelectItem>
+                            <MudSelectItem Value="@("Relief")">Relief</MudSelectItem>
+                            <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; margin-top: 20px;">
+                    Additional Information
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Venue"
+                                      Label="Venue"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Description"
+                                      Label="Description"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true"
+                                      Lines="4" />
+                    </MudItem>
+                </MudGrid>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-radius: 4px;"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px;"
+                               Disabled="_isSaving">
+                        Save
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private readonly EventFormModel _model = new()
+    {
+        EventDate = DateTime.Today,
+        EventTime = DateTime.Now.TimeOfDay
+    };
+
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _loadError;
+
+    private bool IsEditMode => Id.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit Event" : "Add Event";
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode)
+        {
+            await LoadEventAsync(Id!.Value);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadEventAsync(int id)
+    {
+        var eventItem = await EventService.GetEventByIdAsync(id);
+        if (eventItem is null)
+        {
+            _loadError = "Event not found.";
+            return;
+        }
+
+        _model.EventId = eventItem.EventId;
+        _model.Title = eventItem.Title;
+        var parsedDateTime = ParseDateTime(eventItem.EventDate);
+        _model.EventDate = parsedDateTime?.Date;
+        _model.EventTime = parsedDateTime?.TimeOfDay ?? DateTime.Now.TimeOfDay;
+        _model.Venue = eventItem.Venue;
+        _model.EventType = eventItem.EventType;
+        _model.Description = eventItem.Description;
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var eventItem = new Event
+        {
+            EventId = _model.EventId,
+            Title = _model.Title,
+            EventDate = CombineDateAndTime(_model.EventDate, _model.EventTime)?.ToString("yyyy-MM-ddTHH:mm:ss") ?? string.Empty,
+            Venue = _model.Venue,
+            EventType = _model.EventType,
+            Description = _model.Description
+        };
+
+        if (IsEditMode)
+        {
+            var updated = await EventService.UpdateEventAsync(eventItem);
+            if (!updated)
+            {
+                Snackbar.Add("Event could not be updated.", Severity.Error);
+                _isSaving = false;
+                return;
+            }
+
+            Snackbar.Add("Event updated.", Severity.Success);
+        }
+        else
+        {
+            await EventService.CreateEventAsync(eventItem, CurrentUserId);
+            Snackbar.Add("Event created.", Severity.Success);
+        }
+
+        _isSaving = false;
+        NavigationManager.NavigateTo("/events");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/events");
+    }
+
+    private static DateTime? ParseDateTime(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static DateTime? CombineDateAndTime(DateTime? date, TimeSpan? time)
+    {
+        if (!date.HasValue || !time.HasValue)
+        {
+            return null;
+        }
+
+        return date.Value.Date.Add(time.Value);
+    }
+
+    private sealed class EventFormModel
+    {
+        public int EventId { get; set; }
+
+        [Required]
+        public string Title { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime? EventDate { get; set; }
+
+        [Required]
+        public TimeSpan? EventTime { get; set; }
+
+        public string? Venue { get; set; }
+
+        [Required]
+        public string EventType { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+    }
+}

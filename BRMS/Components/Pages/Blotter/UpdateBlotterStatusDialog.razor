@@ -1,0 +1,73 @@
+<MudDialog>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12">
+                <MudSelect T="string" @onblur="StateHasChanged"
+                           @bind-Value="_model.Status"
+                           Label="Status"
+                           Variant="Variant.Outlined"
+                           FullWidth="true">
+                    @foreach (var status in StatusOptions)
+                    {
+                        <MudSelectItem Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string"
+                              @bind-Value="_model.Resolution"
+                              Label="Resolution"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Lines="4" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Confirm">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string CurrentStatus { get; set; } = "Open";
+
+    [Parameter]
+    public string? CurrentResolution { get; set; }
+
+    private static readonly string[] StatusOptions = ["Open", "Under Investigation", "Resolved", "Closed"];
+
+    private readonly StatusDialogModel _model = new();
+
+    protected override void OnInitialized()
+    {
+        _model.Status = CurrentStatus;
+        _model.Resolution = CurrentResolution;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Confirm()
+    {
+        MudDialog.Close(DialogResult.Ok((object)_model));
+    }
+
+    public sealed class StatusDialogModel
+    {
+        public string Status { get; set; } = "Open";
+
+        public string? Resolution { get; set; }
+    }
+}

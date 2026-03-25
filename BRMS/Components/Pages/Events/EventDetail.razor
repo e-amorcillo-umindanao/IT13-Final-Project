@@ -1,0 +1,156 @@
+@page "/events/{Id:int}"
+@inject EventService EventService
+@inject AttendanceService AttendanceService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Event Details</PageTitle>
+
+<div class="page-shell">
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_event is null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Event not found.</MudAlert>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">@_event.Title</h1>
+
+            <div class="page-header-actions">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="@(() => NavigationManager.NavigateTo($"/events/{_event.EventId}/attendance"))">
+                    Record Attendance
+                </MudButton>
+            </div>
+        </div>
+
+        <MudPaper Class="page-card" Elevation="0">
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="detail-label">Title</div>
+                    <div class="detail-value">@_event.Title</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Type</div>
+                    <div class="detail-value">@_event.EventType</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Date</div>
+                    <div class="detail-value">@FormatDateTime(_event.EventDate)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Venue</div>
+                    <div class="detail-value">@(string.IsNullOrWhiteSpace(_event.Venue) ? "-" : _event.Venue)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Description</div>
+                    <div class="detail-value">@(string.IsNullOrWhiteSpace(_event.Description) ? "-" : _event.Description)</div>
+                </div>
+            </div>
+        </MudPaper>
+
+        <MudPaper Class="page-card section-card" Elevation="0">
+            <div class="section-header">
+                <h2 class="section-title">Attendance Summary</h2>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <MudChip T="string" Variant="Variant.Filled" Color="Color.Success">Present: @_presentCount</MudChip>
+                <MudChip T="string" Variant="Variant.Filled" Color="Color.Error">Absent: @_absentCount</MudChip>
+                <MudChip T="string" Variant="Variant.Filled" Color="Color.Warning">Excused: @_excusedCount</MudChip>
+            </div>
+        </MudPaper>
+
+        <MudPaper Class="page-card" Elevation="0">
+            <MudTable T="Attendance"
+                      Items="_attendanceRecords"
+                      Hover="true"
+                      Dense="true"
+                      Bordered="true"
+                      Striped="false">
+                <HeaderContent>
+                    <MudTh>Resident Name</MudTh>
+                    <MudTh>Purok</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Recorded At</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="attendance">
+                    <MudTd DataLabel="Resident Name">@GetResidentName(attendance.Resident)</MudTd>
+                    <MudTd DataLabel="Purok">@(attendance.Resident?.Purok?.Name ?? "-")</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Variant="Variant.Filled" Color="@GetStatusColor(attendance.Status)">
+                            @attendance.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Recorded At">@FormatDateTime(attendance.RecordedAt)</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2" Class="pa-4">No attendance has been recorded for this event yet.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Event? _event;
+    private List<Attendance> _attendanceRecords = [];
+    private bool _isLoading = true;
+    private int _presentCount;
+    private int _absentCount;
+    private int _excusedCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventAsync();
+    }
+
+    private async Task LoadEventAsync()
+    {
+        _isLoading = true;
+        _event = await EventService.GetEventByIdAsync(Id);
+        _attendanceRecords = await AttendanceService.GetAttendanceByEventAsync(Id);
+        _presentCount = _attendanceRecords.Count(attendance => attendance.Status == "Present");
+        _absentCount = _attendanceRecords.Count(attendance => attendance.Status == "Absent");
+        _excusedCount = _attendanceRecords.Count(attendance => attendance.Status == "Excused");
+        _isLoading = false;
+    }
+
+    private static string GetResidentName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return "-";
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Present" => Color.Success,
+            "Absent" => Color.Error,
+            "Excused" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private static string FormatDateTime(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy h:mm tt")
+            : "-";
+    }
+}

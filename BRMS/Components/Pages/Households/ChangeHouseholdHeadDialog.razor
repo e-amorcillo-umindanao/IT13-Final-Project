@@ -1,0 +1,68 @@
+<MudDialog>
+    <DialogContent>
+        @if (Members.Count == 0)
+        {
+            <MudText Typo="Typo.body2">No members are available for head assignment.</MudText>
+        }
+        else
+        {
+            <MudSelect T="int?" @onblur="StateHasChanged"
+                       @bind-Value="_selectedResidentId"
+                       Label="Household Head"
+                       Variant="Variant.Outlined"
+                       FullWidth="true">
+                @foreach (var resident in Members.OrderBy(resident => resident.LastName).ThenBy(resident => resident.FirstName))
+                {
+                    <MudSelectItem Value="@((int?)resident.ResidentId)">@GetResidentName(resident)</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!_selectedResidentId.HasValue)"
+                   OnClick="Confirm">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public List<Resident> Members { get; set; } = [];
+
+    [Parameter]
+    public int? SelectedResidentId { get; set; }
+
+    private int? _selectedResidentId;
+
+    protected override void OnInitialized()
+    {
+        _selectedResidentId = SelectedResidentId;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Confirm()
+    {
+        if (_selectedResidentId.HasValue)
+        {
+            MudDialog.Close(DialogResult.Ok(_selectedResidentId.Value));
+        }
+    }
+
+    private static string GetResidentName(Resident resident)
+    {
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}

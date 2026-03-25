@@ -1,0 +1,281 @@
+﻿@page "/households"
+@inject HouseholdService HouseholdService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Households</PageTitle>
+
+<div class="households-page">
+    <div class="households-header">
+        <h1 class="households-title">Households</h1>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px;box-shadow:none;"
+                   OnClick="@(() => NavigationManager.NavigateTo("/households/new"))">
+            Add Household
+        </MudButton>
+    </div>
+
+    <MudGrid Spacing="2" Class="households-filter-grid">
+        <MudItem xs="12" md="8">
+            <MudTextField T="string"
+                          Value="_searchAddress"
+                          ValueChanged="HandleAddressChangedAsync"
+                          Placeholder="Search by address..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="border-radius:4px"
+                          FullWidth="true"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudSelect T="int?" @onblur="StateHasChanged"
+                       Value="_selectedPurokId"
+                       ValueChanged="HandlePurokChangedAsync"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px"
+                       Label="All Purok"
+                       FullWidth="true">
+                <MudSelectItem Value="@((int?)null)">All</MudSelectItem>
+                @foreach (var purok in _puroks)
+                {
+                    <MudSelectItem Value="@((int?)purok.PurokId)">@purok.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="Household"
+              Items="_households"
+              Elevation="0"
+              Striped="false"
+              Hover="true"
+              RowsPerPage="10"
+              Loading="_isLoading"
+              RowStyle="height:52px"
+              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+              Class="household-table">
+        <HeaderContent>
+            <MudTh>HOUSEHOLD NUMBER</MudTh>
+            <MudTh>ADDRESS</MudTh>
+            <MudTh>PUROK</MudTh>
+            <MudTh>HOUSEHOLD HEAD</MudTh>
+            <MudTh>MEMBERS</MudTh>
+            <MudTh>ACTIONS</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="household">
+            <MudTd DataLabel="HOUSEHOLD NUMBER">@household.HouseholdNumber</MudTd>
+            <MudTd DataLabel="ADDRESS">@household.Address</MudTd>
+            <MudTd DataLabel="PUROK">@(household.Purok?.Name ?? "-")</MudTd>
+            <MudTd DataLabel="HOUSEHOLD HEAD">@GetResidentName(household.HeadResident)</MudTd>
+            <MudTd DataLabel="MEMBERS">@household.Residents.Count</MudTd>
+            <MudTd DataLabel="ACTIONS">
+                <div class="household-actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#1E293B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/households/{household.HouseholdId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#1E293B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/households/edit/{household.HouseholdId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#EF4444;"
+                                   OnClick="@(() => PromptDeleteAsync(household))" />
+                </div>
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <div class="household-empty-state">
+                <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Large" Class="household-empty-icon" />
+                <div class="household-empty-title">No households found</div>
+                <div class="household-empty-message">No households matched the current filters.</div>
+            </div>
+        </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }"
+                           InfoFormat="Showing {first_item}-{last_item} of {all_items} households" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private List<Household> _households = [];
+    private List<Purok> _puroks = [];
+    private bool _isLoading = true;
+    private string _searchAddress = string.Empty;
+    private int? _selectedPurokId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageDataAsync();
+    }
+
+    private async Task LoadPageDataAsync()
+    {
+        _isLoading = true;
+
+        _puroks = await DbContext.Puroks
+            .AsNoTracking()
+            .OrderBy(purok => purok.Name)
+            .ToListAsync();
+
+        _households = await HouseholdService.GetAllHouseholdsAsync();
+        _isLoading = false;
+    }
+
+    private async Task HandleAddressChangedAsync(string value)
+    {
+        _searchAddress = value;
+        await SearchHouseholdsAsync();
+    }
+
+    private async Task HandlePurokChangedAsync(int? value)
+    {
+        _selectedPurokId = value;
+        await SearchHouseholdsAsync();
+    }
+
+    private async Task SearchHouseholdsAsync()
+    {
+        _isLoading = true;
+        _households = await HouseholdService.SearchHouseholdsAsync(_searchAddress, _selectedPurokId);
+        _isLoading = false;
+    }
+
+    private async Task RefreshHouseholdsAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchAddress) || _selectedPurokId.HasValue)
+        {
+            await SearchHouseholdsAsync();
+            return;
+        }
+
+        _isLoading = true;
+        _households = await HouseholdService.GetAllHouseholdsAsync();
+        _isLoading = false;
+    }
+
+    private async Task PromptDeleteAsync(Household household)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Household",
+            [nameof(ConfirmDialog.Message)] = $"Delete household {household.HouseholdNumber}?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Delete",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, () => ConfirmDeleteAsync(household.HouseholdId))
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.ExtraSmall
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task ConfirmDeleteAsync(int householdId)
+    {
+        var deleted = await HouseholdService.DeleteHouseholdAsync(householdId);
+        if (!deleted)
+        {
+            Snackbar.Add("Cannot delete - residents are still assigned.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Household deleted successfully.", Severity.Success);
+        await RefreshHouseholdsAsync();
+    }
+
+    private static string GetResidentName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return "-";
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}
+
+<style>
+    .households-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .households-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .households-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .households-filter-grid {
+        align-items: end;
+    }
+
+    .household-table {
+        overflow: hidden;
+    }
+
+    .household-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .household-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 220px;
+        padding: 32px 16px;
+        text-align: center;
+    }
+
+    .household-empty-icon {
+        font-size: 48px;
+        color: #94A3B8;
+    }
+
+    .household-empty-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .household-empty-message {
+        color: #64748B;
+        font-size: 0.95rem;
+    }
+</style>

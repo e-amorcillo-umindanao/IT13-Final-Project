@@ -1,0 +1,40 @@
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string"
+                      @bind-Value="_remarks"
+                      Label="Remarks"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Lines="4" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Disabled="@string.IsNullOrWhiteSpace(_remarks)"
+                   OnClick="Confirm">
+            Reject
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string? _remarks;
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Confirm()
+    {
+        if (!string.IsNullOrWhiteSpace(_remarks))
+        {
+            MudDialog.Close(DialogResult.Ok(_remarks.Trim()));
+        }
+    }
+}

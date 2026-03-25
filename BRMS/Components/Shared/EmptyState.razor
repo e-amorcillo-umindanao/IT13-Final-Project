@@ -1,0 +1,16 @@
+<div class="empty-state">
+    <MudIcon Icon="@Icon" Size="Size.Large" Class="empty-state-icon" />
+    <div class="empty-state-title">@Title</div>
+    <div class="empty-state-message">@Message</div>
+</div>
+
+@code {
+    [Parameter]
+    public string Icon { get; set; } = Icons.Material.Outlined.Inbox;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+}

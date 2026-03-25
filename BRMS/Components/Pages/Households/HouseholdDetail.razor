@@ -1,0 +1,278 @@
+@page "/households/{Id:int}"
+@inject HouseholdService HouseholdService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Household Details</PageTitle>
+
+<div class="page-shell">
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_household is null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Household not found.</MudAlert>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">Household @_household.HouseholdNumber</h1>
+
+            <div class="page-header-actions">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="@(() => NavigationManager.NavigateTo($"/households/edit/{_household.HouseholdId}"))">
+                    Edit
+                </MudButton>
+            </div>
+        </div>
+
+        <MudPaper Class="page-card" Elevation="0">
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="detail-label">Household Number</div>
+                    <div class="detail-value">@_household.HouseholdNumber</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Address</div>
+                    <div class="detail-value">@_household.Address</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Purok</div>
+                    <div class="detail-value">@(string.IsNullOrWhiteSpace(_household.Purok?.Name) ? "-" : _household.Purok!.Name)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Members</div>
+                    <div class="detail-value">@_household.Residents.Count</div>
+                </div>
+            </div>
+        </MudPaper>
+
+        <MudPaper Class="page-card section-card" Elevation="0">
+            <div class="section-header">
+                <h2 class="section-title">Household Head</h2>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           Disabled="@(!_household.Residents.Any())"
+                           OnClick="OpenChangeHeadDialogAsync">
+                    Change Head
+                </MudButton>
+            </div>
+
+            <MudText Typo="Typo.body1">
+                @(CurrentHeadName)
+            </MudText>
+        </MudPaper>
+
+        <MudPaper Class="page-card section-card" Elevation="0">
+            <div class="section-header">
+                <h2 class="section-title">Members</h2>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="OpenAddMemberDialogAsync">
+                    Add Member
+                </MudButton>
+            </div>
+
+            <MudTable Items="_orderedMembers"
+                      Hover="true"
+                      Dense="true"
+                      Bordered="true"
+                      Striped="false">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Categories</MudTh>
+                    <MudTh>Engagement</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="resident">
+                    <MudTd DataLabel="Name">
+                        <MudLink Href="@($"/residents/{resident.ResidentId}")">@GetResidentName(resident)</MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Status">@resident.Status</MudTd>
+                    <MudTd DataLabel="Categories">@(string.IsNullOrWhiteSpace(resident.Categories) ? "-" : resident.Categories)</MudTd>
+                    <MudTd DataLabel="Engagement">
+                        <EngagementBadge Score="@GetEngagementScore(resident)" />
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => RemoveMemberAsync(resident.ResidentId))" />
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body2" Class="pa-4">No active residents are assigned to this household.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Household? _household;
+    private bool _isLoading = true;
+    private List<Resident> _orderedMembers = [];
+    private int _totalEvents;
+
+    private string CurrentHeadName => _household?.HeadResident is null
+        ? "No household head assigned."
+        : GetResidentName(_household.HeadResident);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHouseholdAsync();
+    }
+
+    private async Task LoadHouseholdAsync()
+    {
+        _isLoading = true;
+        _totalEvents = await DbContext.Events.AsNoTracking().CountAsync();
+        _household = await HouseholdService.GetHouseholdByIdAsync(Id);
+
+        _orderedMembers = _household?.Residents
+            .OrderBy(resident => resident.LastName)
+            .ThenBy(resident => resident.FirstName)
+            .ToList()
+            ?? [];
+
+        _isLoading = false;
+    }
+
+    private async Task OpenChangeHeadDialogAsync()
+    {
+        var household = _household;
+        if (household is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            [nameof(ChangeHouseholdHeadDialog.Members)] = _orderedMembers,
+            [nameof(ChangeHouseholdHeadDialog.SelectedResidentId)] = household.HeadResidentId
+        };
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ChangeHouseholdHeadDialog>("Change Household Head", parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not int residentId)
+        {
+            return;
+        }
+
+        var success = await HouseholdService.SetHouseholdHeadAsync(household.HouseholdId, residentId);
+        if (!success)
+        {
+            Snackbar.Add("Household head could not be changed.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Household head updated.", Severity.Success);
+        await LoadHouseholdAsync();
+    }
+
+    private async Task OpenAddMemberDialogAsync()
+    {
+        var household = _household;
+        if (household is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            [nameof(AddHouseholdMemberDialog.CurrentHouseholdId)] = household.HouseholdId
+        };
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Medium,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AddHouseholdMemberDialog>("Add Household Member", parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not int residentId)
+        {
+            return;
+        }
+
+        var success = await HouseholdService.AssignResidentToHouseholdAsync(residentId, household.HouseholdId);
+        if (!success)
+        {
+            Snackbar.Add("Resident could not be assigned to this household.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Resident assigned to household.", Severity.Success);
+        await LoadHouseholdAsync();
+    }
+
+    private async Task RemoveMemberAsync(int residentId)
+    {
+        var success = await HouseholdService.RemoveResidentFromHouseholdAsync(residentId);
+        if (!success)
+        {
+            Snackbar.Add("Resident could not be removed from this household.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Resident removed from household.", Severity.Success);
+        await LoadHouseholdAsync();
+    }
+
+    private int GetEngagementScore(Resident resident)
+    {
+        var eventsAttended = resident.Attendances.Count(attendance => IsAttendedStatus(attendance.Status));
+        var cutoffDate = DateTime.Today.AddMonths(-6);
+        var interactionsLast6Months = resident.InteractionLogs.Count(log =>
+        {
+            var interactionDate = ParseDate(log.InteractionDate);
+            return interactionDate.HasValue && interactionDate.Value.Date >= cutoffDate;
+        });
+
+        var lastInteractionDate = resident.InteractionLogs
+            .Select(log => ParseDate(log.InteractionDate))
+            .Where(date => date.HasValue)
+            .Max();
+
+        return EngagementCalculator.CalculateScore(_totalEvents, eventsAttended, interactionsLast6Months, lastInteractionDate);
+    }
+
+    private static bool IsAttendedStatus(string status)
+    {
+        return status.Equals("Attended", StringComparison.OrdinalIgnoreCase) ||
+               status.Equals("Present", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static string GetResidentName(Resident resident)
+    {
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}

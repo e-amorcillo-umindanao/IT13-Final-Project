@@ -1,0 +1,288 @@
+@page "/blotter/new"
+@page "/blotter/edit/{Id:int}"
+@inject BlotterService BlotterService
+@inject ResidentService ResidentService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="page-shell">
+    <div class="page-header">
+        <h1 class="page-title">@PageTitleText</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 24px; margin-top: 16px;">
+            <EditForm Model="_model" OnValidSubmit="HandleSaveAsync">
+                <DataAnnotationsValidator />
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+                    Parties Involved
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int?" @onblur="StateHasChanged"
+                                   Value="_model.ComplainantId"
+                                   ValueChanged="HandleComplainantIdChangedAsync"
+                                   Label="Complainant Resident"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px;"
+                                   Clearable="true"
+                                   FullWidth="true">
+                            @foreach (var resident in _residents)
+                            {
+                                <MudSelectItem Value="@((int?)resident.ResidentId)">
+                                    @ResidentToString(resident)
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.ComplainantName"
+                                      For="@(() => _model.ComplainantName)"
+                                      Label="Complainant Name*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.RespondentName"
+                                      For="@(() => _model.RespondentName)"
+                                      Label="Respondent Name*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; margin-top: 20px;">
+                    Incident Information
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.IncidentType"
+                                   For="@(() => _model.IncidentType)"
+                                   Label="Incident Type*"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px;"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@("Dispute")">Dispute</MudSelectItem>
+                            <MudSelectItem Value="@("Noise")">Noise</MudSelectItem>
+                            <MudSelectItem Value="@("Physical Altercation")">Physical Altercation</MudSelectItem>
+                            <MudSelectItem Value="@("Theft")">Theft</MudSelectItem>
+                            <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="_model.IncidentDate"
+                                       For="@(() => _model.IncidentDate)"
+                                       Label="Incident Date*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px; width: 100%;"
+                                       DateFormat="MMMM dd, yyyy"
+                                       Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.IncidentDetails"
+                                      For="@(() => _model.IncidentDetails)"
+                                      Label="Incident Details*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px;"
+                                      FullWidth="true"
+                                      Lines="6" />
+                    </MudItem>
+                </MudGrid>
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-radius: 4px;"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px;"
+                               Disabled="_isSaving">
+                        Save
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private readonly BlotterFormModel _model = new()
+    {
+        IncidentDate = DateTime.Today
+    };
+
+    private List<Resident> _residents = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _loadError;
+
+    private bool IsEditMode => Id.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit Blotter Record" : "File New Blotter";
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _residents = await ResidentService.GetAllResidentsAsync();
+
+        if (IsEditMode)
+        {
+            await LoadBlotterAsync(Id!.Value);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadBlotterAsync(int id)
+    {
+        var entry = await BlotterService.GetBlotterByIdAsync(id);
+        if (entry is null)
+        {
+            _loadError = "Blotter record not found.";
+            return;
+        }
+
+        _model.BlotterEntryId = entry.BlotterEntryId;
+        _model.ComplainantId = entry.ComplainantId;
+        _model.ComplainantName = entry.ComplainantName;
+        _model.RespondentName = entry.RespondentName;
+        _model.IncidentType = entry.IncidentType;
+        _model.IncidentDate = ParseDate(entry.IncidentDate);
+        _model.IncidentDetails = entry.IncidentDetails;
+    }
+
+    private Task HandleComplainantIdChangedAsync(int? residentId)
+    {
+        _model.ComplainantId = residentId;
+        var resident = _residents.FirstOrDefault(candidate => candidate.ResidentId == residentId);
+        if (resident is not null)
+        {
+            _model.ComplainantName = ResidentToString(resident);
+        }
+        else
+        {
+            _model.ComplainantName = string.Empty;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var entry = new BlotterEntry
+        {
+            BlotterEntryId = _model.BlotterEntryId,
+            ComplainantId = _model.ComplainantId,
+            ComplainantName = _model.ComplainantName,
+            RespondentName = _model.RespondentName,
+            IncidentType = _model.IncidentType,
+            IncidentDate = _model.IncidentDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            IncidentDetails = _model.IncidentDetails,
+            Status = "Open"
+        };
+
+        if (IsEditMode)
+        {
+            var updated = await BlotterService.UpdateBlotterAsync(entry, CurrentUserId);
+            if (!updated)
+            {
+                Snackbar.Add("Blotter record could not be updated.", Severity.Error);
+                _isSaving = false;
+                return;
+            }
+
+            Snackbar.Add("Blotter record updated.", Severity.Success);
+        }
+        else
+        {
+            await BlotterService.CreateBlotterAsync(entry, CurrentUserId);
+            Snackbar.Add("Blotter record filed.", Severity.Success);
+        }
+
+        _isSaving = false;
+        NavigationManager.NavigateTo("/blotter");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/blotter");
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static string ResidentToString(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private sealed class BlotterFormModel
+    {
+        public int BlotterEntryId { get; set; }
+
+        public int? ComplainantId { get; set; }
+
+        [Required]
+        public string ComplainantName { get; set; } = string.Empty;
+
+        [Required]
+        public string RespondentName { get; set; } = string.Empty;
+
+        [Required]
+        public string IncidentType { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime? IncidentDate { get; set; }
+
+        [Required]
+        public string IncidentDetails { get; set; } = string.Empty;
+    }
+}

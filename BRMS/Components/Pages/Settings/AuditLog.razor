@@ -1,0 +1,182 @@
+@using Microsoft.AspNetCore.Components.Web
+@inject AuditService AuditService
+
+<div class="section-card">
+    <MudGrid Spacing="2" Style="margin-bottom: 16px;">
+        <MudItem xs="12" md="3">
+            <MudTextField T="string"
+                          Value="filterUsername"
+                          ValueChanged="HandleUsernameChanged"
+                          Placeholder="Filter by username..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.None"
+                          Style="border-radius: 4px;"
+                          Immediate="true"
+                          OnKeyUp="HandleKeyUp" />
+        </MudItem>
+
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="filterAction"
+                       ValueChanged="HandleActionChanged"
+                       Placeholder="Filter by action"
+                       Variant="Variant.Outlined"
+                       Style="border-radius: 4px;"
+                       Clearable="true">
+                <MudSelectItem Value="@string.Empty">All Actions</MudSelectItem>
+                <MudSelectItem Value="@("Login")">Login</MudSelectItem>
+                <MudSelectItem Value="@("Create")">Create</MudSelectItem>
+                <MudSelectItem Value="@("Update")">Update</MudSelectItem>
+                <MudSelectItem Value="@("Delete")">Delete</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="filterTable"
+                       ValueChanged="HandleTableChanged"
+                       Placeholder="Filter by table"
+                       Variant="Variant.Outlined"
+                       Style="border-radius: 4px;"
+                       Clearable="true">
+                <MudSelectItem Value="@string.Empty">All Tables</MudSelectItem>
+                <MudSelectItem Value="@("Users")">Users</MudSelectItem>
+                <MudSelectItem Value="@("Residents")">Residents</MudSelectItem>
+                <MudSelectItem Value="@("Households")">Households</MudSelectItem>
+                <MudSelectItem Value="@("Events")">Events</MudSelectItem>
+                <MudSelectItem Value="@("Attendances")">Attendances</MudSelectItem>
+                <MudSelectItem Value="@("InteractionLogs")">InteractionLogs</MudSelectItem>
+                <MudSelectItem Value="@("BlotterEntries")">BlotterEntries</MudSelectItem>
+                <MudSelectItem Value="@("ClearanceRequests")">ClearanceRequests</MudSelectItem>
+                <MudSelectItem Value="@("BarangaySettings")">BarangaySettings</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" md="3">
+            <MudDateRangePicker DateRange="filterDateRange"
+                                DateRangeChanged="HandleDateRangeChanged"
+                                Placeholder="Filter by date range"
+                                Variant="Variant.Outlined"
+                                Style="border-radius: 4px;"
+                                DateFormat="MMM dd, yyyy" />
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="BRMS.Models.AuditLog"
+              Items="filteredLogs"
+              Hover="true"
+              Dense="true"
+              Bordered="true"
+              Striped="false"
+              RowsPerPage="10"
+              Loading="_isLoading">
+        <HeaderContent>
+            <MudTh>Timestamp</MudTh>
+            <MudTh>Username</MudTh>
+            <MudTh>Action</MudTh>
+            <MudTh>Table</MudTh>
+            <MudTh>Record ID</MudTh>
+            <MudTh>Details</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="log">
+            <MudTd DataLabel="Timestamp">@FormatDateTime(log.Timestamp)</MudTd>
+            <MudTd DataLabel="Username">@(log.User?.Username ?? "-")</MudTd>
+            <MudTd DataLabel="Action">@log.Action</MudTd>
+            <MudTd DataLabel="Table">@log.TableAffected</MudTd>
+            <MudTd DataLabel="Record ID">@(log.RecordId?.ToString() ?? "-")</MudTd>
+            <MudTd DataLabel="Details">@(string.IsNullOrWhiteSpace(log.Details) ? "-" : log.Details)</MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <EmptyState Icon="@Icons.Material.Outlined.History"
+                        Title="No audit records"
+                        Message="Audit entries will appear here as users work through the system." />
+        </NoRecordsContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="_pageSizeOptions" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private static readonly int[] _pageSizeOptions = [10, 25, 50];
+
+    private string filterUsername = string.Empty;
+    private string filterAction = string.Empty;
+    private string filterTable = string.Empty;
+    private DateRange filterDateRange = new(null, null);
+
+    private List<BRMS.Models.AuditLog> filteredLogs = [];
+    private List<BRMS.Models.AuditLog> allLogs = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allLogs = await AuditService.GetAllLogsAsync();
+        filteredLogs = allLogs;
+        _isLoading = false;
+    }
+
+    private void HandleUsernameChanged(string value)
+    {
+        filterUsername = value;
+        ApplyFilters();
+    }
+
+    private void HandleActionChanged(string value)
+    {
+        filterAction = value;
+        ApplyFilters();
+    }
+
+    private void HandleTableChanged(string value)
+    {
+        filterTable = value;
+        ApplyFilters();
+    }
+
+    private void HandleDateRangeChanged(DateRange range)
+    {
+        filterDateRange = range;
+        ApplyFilters();
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs _)
+    {
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        filteredLogs = allLogs
+            .Where(log =>
+            {
+                var logDate = ParseTimestampDate(log.Timestamp);
+
+                return (string.IsNullOrEmpty(filterUsername) ||
+                        (log.User?.Username?.Contains(filterUsername, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+                       (string.IsNullOrEmpty(filterAction) ||
+                        log.Action == filterAction) &&
+                       (string.IsNullOrEmpty(filterTable) ||
+                        log.TableAffected == filterTable) &&
+                       (!filterDateRange.Start.HasValue ||
+                        (logDate.HasValue && logDate.Value.Date >= filterDateRange.Start.Value.Date)) &&
+                       (!filterDateRange.End.HasValue ||
+                        (logDate.HasValue && logDate.Value.Date <= filterDateRange.End.Value.Date));
+            })
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    private static DateTime? ParseTimestampDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static string FormatDateTime(string value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy h:mm tt")
+            : "-";
+    }
+}

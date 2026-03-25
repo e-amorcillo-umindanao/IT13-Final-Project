@@ -1,0 +1,231 @@
+﻿@page "/engagement"
+@inject EngagementService EngagementService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Engagement Overview</PageTitle>
+
+<div class="engagement-page">
+    <div class="engagement-header">
+        <h1 class="engagement-title">Engagement Overview</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="engagement-loading-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="0" Style="border:1px solid #E2E8F0; border-radius:4px; border-left: 4px solid #22C55E; padding:20px;">
+                    <div class="engagement-kpi-label">High Engagement</div>
+                    <div class="engagement-kpi-value">@HighCount</div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="0" Style="border:1px solid #E2E8F0; border-radius:4px; border-left: 4px solid #F59E0B; padding:20px;">
+                    <div class="engagement-kpi-label">Medium Engagement</div>
+                    <div class="engagement-kpi-value">@MediumCount</div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="0" Style="border:1px solid #E2E8F0; border-radius:4px; border-left: 4px solid #EF4444; padding:20px;">
+                    <div class="engagement-kpi-label">Low Engagement</div>
+                    <div class="engagement-kpi-value">@LowCount</div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <div class="engagement-filter-bar">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedBadgeLevel"
+                       ValueChanged="HandleBadgeLevelChanged"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px; max-width:200px"
+                       Label="Badge Level"
+                       FullWidth="true">
+                @foreach (var option in BadgeLevelOptions)
+                {
+                    <MudSelectItem Value="@option">@option</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        <MudTable T="ResidentEngagementSummary"
+                  Items="FilteredSummaries"
+                  Elevation="0"
+                  Striped="false"
+                  Hover="true"
+                  RowStyle="height:52px"
+                  RowsPerPage="10"
+                  Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+                  Class="engagement-overview-table">
+            <HeaderContent>
+                <MudTh>RESIDENT NAME</MudTh>
+                <MudTh>PUROK</MudTh>
+                <MudTh>LAST INTERACTION</MudTh>
+                <MudTh>
+                    <MudTableSortLabel T="ResidentEngagementSummary"
+                                       InitialDirection="SortDirection.Descending"
+                                       SortBy="@(summary => summary.Score)">
+                        SCORE
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh>BADGE</MudTh>
+                <MudTh>ACTIONS</MudTh>
+            </HeaderContent>
+
+            <RowTemplate Context="summary">
+                <MudTd DataLabel="RESIDENT NAME" Class="engagement-cell-primary">@summary.FullName</MudTd>
+                <MudTd DataLabel="PUROK" Class="engagement-cell-primary">@(summary.PurokName ?? "-")</MudTd>
+                <MudTd DataLabel="LAST INTERACTION" Class="engagement-cell-muted">@FormatDate(summary.LastInteractionDate)</MudTd>
+                <MudTd DataLabel="SCORE" Class="engagement-cell-primary">@summary.Score</MudTd>
+                <MudTd DataLabel="BADGE">
+                    <EngagementBadge Score="@summary.Score" />
+                </MudTd>
+                <MudTd DataLabel="ACTIONS">
+                    <div class="engagement-actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Style="color:#64748B;"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/residents/{summary.ResidentId}"))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.AddComment"
+                                       Size="Size.Small"
+                                       Color="Color.Default"
+                                       Style="color:#64748B;"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/engagement/log/{summary.ResidentId}"))" />
+                    </div>
+                </MudTd>
+            </RowTemplate>
+
+            <NoRecordsContent>
+                <div class="engagement-empty-state">No engagement summaries found.</div>
+            </NoRecordsContent>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+            </PagerContent>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private static readonly string[] BadgeLevelOptions = ["All", "High", "Medium", "Low"];
+
+    private List<ResidentEngagementSummary> _summaries = [];
+    private bool _isLoading = true;
+    private string _selectedBadgeLevel = "All";
+
+    private IEnumerable<ResidentEngagementSummary> FilteredSummaries =>
+        _selectedBadgeLevel switch
+        {
+            "High" => _summaries.Where(summary => summary.Score >= 75),
+            "Medium" => _summaries.Where(summary => summary.Score >= 40 && summary.Score < 75),
+            "Low" => _summaries.Where(summary => summary.Score < 40),
+            _ => _summaries
+        };
+
+    private int HighCount => _summaries.Count(summary => summary.Score >= 75);
+    private int MediumCount => _summaries.Count(summary => summary.Score >= 40 && summary.Score < 75);
+    private int LowCount => _summaries.Count(summary => summary.Score < 40);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        _summaries = await EngagementService.GetAllEngagementSummariesAsync();
+        _isLoading = false;
+    }
+
+    private void HandleBadgeLevelChanged(string value)
+    {
+        _selectedBadgeLevel = value;
+    }
+
+    private static string FormatDate(DateTime? date)
+    {
+        return date?.ToString("MMMM dd, yyyy") ?? "-";
+    }
+}
+
+<style>
+    .engagement-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .engagement-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .engagement-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .engagement-loading-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 140px;
+        padding: 24px;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+    }
+
+    .engagement-kpi-label {
+        color: #1E293B;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .engagement-kpi-value {
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .engagement-filter-bar {
+        display: flex;
+        align-items: center;
+    }
+
+    .engagement-cell-primary {
+        color: #1E293B;
+    }
+
+    .engagement-cell-muted {
+        color: #64748B;
+    }
+
+    .engagement-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .engagement-overview-table .mud-chip {
+        border-radius: 4px !important;
+    }
+
+    .engagement-empty-state {
+        padding: 24px 16px;
+        color: #64748B;
+        text-align: center;
+    }
+</style>

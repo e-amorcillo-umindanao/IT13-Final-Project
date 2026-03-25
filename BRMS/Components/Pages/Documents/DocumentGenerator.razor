@@ -1,0 +1,384 @@
+@page "/documents"
+@inject ResidentService ResidentService
+@inject EngagementService EngagementService
+@inject DocumentService DocumentService
+@inject ISnackbar Snackbar
+
+<PageTitle>Document Generator</PageTitle>
+
+<div class="document-generator-page">
+    <div class="document-generator-header">
+        <h1 class="document-generator-title">Document Generator</h1>
+    </div>
+
+    <MudCard Elevation="0"
+             Class="document-step-card"
+             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+        <div class="document-step-label">Step 1: Select Resident</div>
+
+        <MudAutocomplete T="Resident"
+                         Label="Search resident..."
+                         Variant="Variant.Outlined"
+                         Style="border-radius:4px"
+                         FullWidth="true"
+                         SearchFunc="SearchResidentsAsync"
+                         ToStringFunc="ResidentToDisplayName"
+                         Value="_selectedResident"
+                         ValueChanged="HandleResidentChangedAsync"
+                         ShowProgressIndicator="true"
+                         ResetValueOnEmptyText="true"
+                         CoerceText="true"
+                         Clearable="true" />
+
+        @if (_selectedResident is not null)
+        {
+            <div class="document-selected-resident">
+                <MudText Class="document-selected-name">@ResidentToDisplayName(_selectedResident)</MudText>
+                <EngagementBadge Score="_engagementScore" />
+            </div>
+        }
+    </MudCard>
+
+    <MudCard Elevation="0"
+             Class="document-step-card"
+             Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+        <div class="document-step-label">Step 2: Select Document Type</div>
+
+        <MudGrid Spacing="2">
+            @foreach (var docType in _documentTypes)
+            {
+                var isSelected = string.Equals(_selectedDocumentType, docType.Value, StringComparison.Ordinal);
+
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0"
+                              @onclick="@(() => SelectDocumentType(docType.Value))"
+                              Style="@($"border: {(isSelected ? "2px solid #3B5BDB" : "1px solid #E2E8F0")}; border-radius: 4px; background: {(isSelected ? "#EEF2FF" : "#FFFFFF")}; padding: 16px; cursor: pointer; margin-bottom: 8px; transition: border 0.15s ease;")">
+                        <MudText Style="@($"font-weight: {(isSelected ? "600" : "400")}; color: {(isSelected ? "#3B5BDB" : "#1E293B")}; font-size: 0.9rem;")">
+                            @docType.Label
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudCard>
+
+    @if (IsOfficialLetterSelected)
+    {
+        <MudCard Elevation="0"
+                 Class="document-step-card"
+                 Style="border:1px solid #E2E8F0; border-radius:4px; padding:24px; margin-bottom:16px;">
+            <div class="document-step-label">Step 3: Official Letter Details</div>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  Value="_letterModel.RecipientName"
+                                  ValueChanged="HandleRecipientNameChanged"
+                                  Label="Recipient Name"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  Value="_letterModel.RecipientAddress"
+                                  ValueChanged="HandleRecipientAddressChanged"
+                                  Label="Recipient Address"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Value="_letterModel.Subject"
+                                  ValueChanged="HandleSubjectChanged"
+                                  Label="Subject"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Value="_letterModel.Body"
+                                  ValueChanged="HandleBodyChanged"
+                                  Label="Body"
+                                  Variant="Variant.Outlined"
+                                  Style="border-radius:4px"
+                                  FullWidth="true"
+                                  Lines="6" />
+                </MudItem>
+            </MudGrid>
+        </MudCard>
+    }
+
+    <div class="document-actions">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Style="border-radius:4px; margin-right:8px"
+                   OnClick="HandleClear">
+            Clear
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px"
+                   Disabled="@(!CanGenerate || _isGenerating)"
+                   OnClick="HandleGeneratePdfAsync">
+            Generate PDF
+        </MudButton>
+    </div>
+</div>
+
+@code {
+    private Resident? _selectedResident;
+    private string _selectedDocumentType = string.Empty;
+    private int _engagementScore;
+    private bool _isGenerating;
+    private readonly OfficialLetterModel _letterModel = new();
+    private readonly List<(string Value, string Label)> _documentTypes = new()
+    {
+        ("residency", "Certificate of Residency"),
+        ("indigency", "Certificate of Indigency"),
+        ("letter", "Official Letter")
+    };
+
+    private bool IsOfficialLetterSelected => string.Equals(_selectedDocumentType, "letter", StringComparison.Ordinal);
+    private bool CanGenerate => _selectedResident is not null && !string.IsNullOrWhiteSpace(_selectedDocumentType);
+
+    private async Task<IEnumerable<Resident>> SearchResidentsAsync(string value, CancellationToken cancellationToken)
+    {
+        var residents = await ResidentService.SearchResidentsAsync(value, "Active", null, null, null);
+        return residents.Take(10);
+    }
+
+    private async Task HandleResidentChangedAsync(Resident? resident)
+    {
+        _selectedResident = resident;
+        _engagementScore = resident is null ? 0 : await EngagementService.GetEngagementScoreAsync(resident.ResidentId);
+    }
+
+    private void SelectDocumentType(string key)
+    {
+        _selectedDocumentType = key;
+    }
+
+    private void HandleRecipientNameChanged(string value)
+    {
+        _letterModel.RecipientName = value;
+    }
+
+    private void HandleRecipientAddressChanged(string value)
+    {
+        _letterModel.RecipientAddress = value;
+    }
+
+    private void HandleSubjectChanged(string value)
+    {
+        _letterModel.Subject = value;
+    }
+
+    private void HandleBodyChanged(string value)
+    {
+        _letterModel.Body = value;
+    }
+
+    private async Task HandleGeneratePdfAsync()
+    {
+        if (_isGenerating)
+        {
+            return;
+        }
+
+        if (_selectedResident is null)
+        {
+            Snackbar.Add("Please select a resident.", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedDocumentType))
+        {
+            return;
+        }
+
+        if (IsOfficialLetterSelected && !_letterModel.IsComplete)
+        {
+            Snackbar.Add("Please fill in all letter details.", Severity.Error);
+            return;
+        }
+
+        _isGenerating = true;
+
+        try
+        {
+            byte[] pdfBytes;
+            string suggestedFileName;
+
+            switch (_selectedDocumentType)
+            {
+                case "residency":
+                    pdfBytes = await DocumentService.GenerateCertificateOfResidencyAsync(_selectedResident.ResidentId);
+                    suggestedFileName = BuildFileName("certificate_residency", _selectedResident.LastName);
+                    break;
+                case "indigency":
+                    pdfBytes = await DocumentService.GenerateCertificateOfIndigencyAsync(_selectedResident.ResidentId);
+                    suggestedFileName = BuildFileName("certificate_indigency", _selectedResident.LastName);
+                    break;
+                case "letter":
+                    pdfBytes = await DocumentService.GenerateOfficialLetterAsync(
+                        _selectedResident.ResidentId,
+                        _letterModel.RecipientName,
+                        _letterModel.RecipientAddress,
+                        _letterModel.Subject,
+                        _letterModel.Body);
+                    suggestedFileName = BuildFileName("official_letter", _selectedResident.LastName);
+                    break;
+                default:
+                    return;
+            }
+
+            var picker = new Windows.Storage.Pickers.FileSavePicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = suggestedFileName
+            };
+
+            picker.FileTypeChoices.Add("PDF Document", [".pdf"]);
+
+            var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+            var platformWindow = mauiWindow?.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+            if (platformWindow is null)
+            {
+                Snackbar.Add("Save dialog is not available right now.", Severity.Error);
+                return;
+            }
+
+            var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(platformWindow);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+
+            var file = await picker.PickSaveFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+
+            await Windows.Storage.FileIO.WriteBytesAsync(file, pdfBytes);
+            Snackbar.Add("PDF generated successfully.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Document generation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private void HandleClear()
+    {
+        _selectedResident = null;
+        _selectedDocumentType = string.Empty;
+        _engagementScore = 0;
+        _letterModel.Clear();
+    }
+
+    private static string ResidentToDisplayName(Resident? resident)
+    {
+        if (resident is null)
+        {
+            return string.Empty;
+        }
+
+        return $"{resident.LastName}, {resident.FirstName}";
+    }
+
+    private static string BuildFileName(string prefix, string lastName)
+    {
+        var safeLastName = string.Concat(lastName
+            .Where(character => char.IsLetterOrDigit(character) || character == '_' || character == '-'))
+            .ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(safeLastName))
+        {
+            safeLastName = "resident";
+        }
+
+        return $"{prefix}_{safeLastName}_{DateTime.Today:yyyyMMdd}.pdf";
+    }
+
+    private sealed class OfficialLetterModel
+    {
+        public string RecipientName { get; set; } = string.Empty;
+        public string RecipientAddress { get; set; } = string.Empty;
+        public string Subject { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+
+        public bool IsComplete =>
+            !string.IsNullOrWhiteSpace(RecipientName) &&
+            !string.IsNullOrWhiteSpace(RecipientAddress) &&
+            !string.IsNullOrWhiteSpace(Subject) &&
+            !string.IsNullOrWhiteSpace(Body);
+
+        public void Clear()
+        {
+            RecipientName = string.Empty;
+            RecipientAddress = string.Empty;
+            Subject = string.Empty;
+            Body = string.Empty;
+        }
+    }
+}
+
+<style>
+    .document-generator-page {
+        display: flex;
+        flex-direction: column;
+        background: #F8F9FA;
+    }
+
+    .document-generator-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .document-generator-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .document-step-card {
+        background: #FFFFFF;
+    }
+
+    .document-step-label {
+        margin-bottom: 16px;
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .document-selected-resident {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+    }
+
+    .document-selected-name {
+        color: #1E293B;
+    }
+    .document-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+</style>

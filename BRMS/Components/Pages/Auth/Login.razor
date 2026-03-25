@@ -6,11 +6,9 @@
 <PageTitle>Login</PageTitle>
 
 <div class="login-page">
-    <div class="login-card">
-        <div class="login-header">
-            <MudText Typo="Typo.h4" Class="login-title">BRMS</MudText>
-            <MudText Typo="Typo.body2" Class="login-subtitle">Barangay Resident Management System</MudText>
-        </div>
+    <MudPaper Class="login-card" Elevation="0">
+        <MudText Class="login-title">BRMS</MudText>
+        <MudText Class="login-subtitle">Barangay Resident Management System</MudText>
 
         <EditForm Model="_model" OnValidSubmit="HandleLoginAsync">
             <DataAnnotationsValidator />
@@ -18,14 +16,14 @@
             <div class="login-form">
                 <MudTextField @bind-Value="_model.Username"
                               For="@(() => _model.Username)"
-                              Label="Username"
+                              Placeholder="Username"
                               Variant="Variant.Outlined"
                               FullWidth="true"
                               Immediate="true" />
 
                 <MudTextField @bind-Value="_model.Password"
                               For="@(() => _model.Password)"
-                              Label="Password"
+                              Placeholder="Password"
                               Variant="Variant.Outlined"
                               FullWidth="true"
                               Immediate="true"
@@ -36,12 +34,13 @@
 
                 @if (!string.IsNullOrWhiteSpace(_errorMessage))
                 {
-                    <div class="login-error">@_errorMessage</div>
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="login-alert">
+                        @_errorMessage
+                    </MudAlert>
                 }
 
                 <MudButton ButtonType="ButtonType.Submit"
                            Variant="Variant.Filled"
-                           Color="Color.Primary"
                            FullWidth="true"
                            Disabled="@_isSubmitting"
                            Class="login-button">
@@ -50,8 +49,8 @@
             </div>
         </EditForm>
 
-        <MudText Typo="Typo.caption" Class="login-footer">© Barangay Catalunan Pequeño</MudText>
-    </div>
+        <MudText Class="login-footer">&#169; Barangay Catalunan Peque&#241;o</MudText>
+    </MudPaper>
 </div>
 
 @code {
@@ -122,19 +121,20 @@
         border: 1px solid #E2E8F0;
         border-radius: 4px;
         background: #FFFFFF;
-    }
-
-    .login-header {
-        margin-bottom: 24px;
+        box-shadow: none;
     }
 
     .login-title {
-        margin-bottom: 4px;
+        margin: 0 0 4px;
+        font-size: 2rem;
         font-weight: 700;
-        color: #0F172A;
+        line-height: 1.2;
+        color: #1E293B;
     }
 
     .login-subtitle {
+        margin: 0 0 24px;
+        font-size: 0.9rem;
         color: #64748B;
     }
 
@@ -144,16 +144,23 @@
         gap: 16px;
     }
 
-    .login-button {
-        height: 44px;
-        border-radius: 4px;
-        font-weight: 700;
-        letter-spacing: 0.02em;
+    .login-alert {
+        margin: 0;
     }
 
-    .login-error {
-        color: #DC2626;
-        font-size: 13px;
+    .login-button {
+        height: 48px;
+        border-radius: 4px;
+        font-weight: 700;
+        color: #FFFFFF;
+        background: #3B5BDB;
+        box-shadow: none;
+    }
+
+    .login-button:hover,
+    .login-button:focus-visible {
+        background: #3B5BDB;
+        box-shadow: none;
     }
 
     .login-footer {
@@ -161,5 +168,6 @@
         margin-top: 24px;
         text-align: center;
         color: #94A3B8;
+        font-size: 0.75rem;
     }
 </style>

@@ -1,6 +1,15 @@
 @inherits LayoutComponentBase
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject SessionHelper SessionHelper
+@implements IDisposable
 
-<div class="main-layout-shell">
+<div class="main-layout-shell"
+     tabindex="0"
+     @onclick="@(_ => ResetSessionTimer())"
+     @onmousemove="@(_ => ResetSessionTimer())"
+     @onmousedown="@(_ => ResetSessionTimer())"
+     @onkeydown="@(_ => ResetSessionTimer())">
     <aside class="main-layout-sidebar">
         <Sidebar />
     </aside>
@@ -14,10 +23,77 @@
     </main>
 </div>
 
+@code {
+    private Timer? _sessionCheckTimer;
+    private bool _isCheckingSession;
+
+    protected override void OnInitialized()
+    {
+        SessionHelper.ResetTimer();
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        AuthService.AuthStateChanged += HandleAuthStateChanged;
+        _sessionCheckTimer = new Timer(_ => _ = CheckSessionExpirationAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        ResetSessionTimer();
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        if (AuthService.IsAuthenticated)
+        {
+            ResetSessionTimer();
+        }
+    }
+
+    private void ResetSessionTimer()
+    {
+        SessionHelper.ResetTimer();
+    }
+
+    private async Task CheckSessionExpirationAsync()
+    {
+        if (_isCheckingSession || !AuthService.IsAuthenticated || !SessionHelper.IsSessionExpired())
+        {
+            return;
+        }
+
+        _isCheckingSession = true;
+
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                if (!AuthService.IsAuthenticated || !SessionHelper.IsSessionExpired())
+                {
+                    return;
+                }
+
+                await AuthService.LogoutAsync("Session expired after 15 minutes of inactivity.");
+                NavigationManager.NavigateTo("/login", false);
+            });
+        }
+        finally
+        {
+            _isCheckingSession = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+        AuthService.AuthStateChanged -= HandleAuthStateChanged;
+        _sessionCheckTimer?.Dispose();
+    }
+}
+
 <style>
     .main-layout-shell {
         min-height: 100vh;
         background: #F8F9FA;
+        outline: none;
     }
 
     .main-layout-sidebar {

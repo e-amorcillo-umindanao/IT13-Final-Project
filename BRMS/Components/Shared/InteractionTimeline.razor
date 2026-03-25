@@ -1,0 +1,53 @@
+@inject InteractionService InteractionService
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_interactions.Count == 0)
+{
+    <MudText Typo="Typo.body2">No interactions recorded yet.</MudText>
+}
+else
+{
+    <div class="timeline-list">
+        @foreach (var interaction in _interactions)
+        {
+            <div class="timeline-item">
+                <div class="timeline-date">@FormatDate(interaction.InteractionDate)</div>
+                <div class="timeline-content">
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Variant="Variant.Outlined"
+                             Color="Color.Primary">
+                        @interaction.InteractionType
+                    </MudChip>
+                    <MudText Typo="Typo.body2" Class="mt-3">@interaction.Notes</MudText>
+                    <div class="timeline-meta">Recorded by @(interaction.CreatedByUser?.Username ?? "Staff")</div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int ResidentId { get; set; }
+
+    private List<InteractionLog> _interactions = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _interactions = await InteractionService.GetInteractionsByResidentAsync(ResidentId);
+        _isLoading = false;
+    }
+
+    private static string FormatDate(string value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy")
+            : value;
+    }
+}

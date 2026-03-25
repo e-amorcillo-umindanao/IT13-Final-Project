@@ -1,4 +1,5 @@
 using BRMS.Data;
+using BRMS.Helpers;
 using BRMS.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -82,11 +83,16 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(brmsTheme);
         builder.Services.AddMauiBlazorWebView();
-        builder.Services.AddMudServices();
+        builder.Services.AddMudServices(config =>
+        {
+            config.SnackbarConfiguration.PositionClass =
+                Defaults.Classes.Position.BottomRight;
+        });
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlite($"Data Source={databasePath}"));
 
         builder.Services.AddScoped<AuthService>();
+        builder.Services.AddScoped<CsvImportHelper>();
         builder.Services.AddScoped<ResidentService>();
         builder.Services.AddScoped<HouseholdService>();
         builder.Services.AddScoped<EventService>();
@@ -99,6 +105,7 @@ public static class MauiProgram
         builder.Services.AddScoped<ReportService>();
         builder.Services.AddScoped<AuditService>();
         builder.Services.AddScoped<BackupService>();
+        builder.Services.AddSingleton<SessionHelper>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
@@ -110,7 +117,18 @@ public static class MauiProgram
         var app = builder.Build();
 
         using var scope = app.Services.CreateScope();
-        SeedData.InitializeAsync(scope.ServiceProvider).GetAwaiter().GetResult();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        dbContext.Database.Migrate();
+
+        try
+        {
+            SeedData.InitializeAsync(scope.ServiceProvider).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SeedData initialization failed: {ex.Message}");
+            Console.WriteLine(ex);
+        }
 
         return app;
     }

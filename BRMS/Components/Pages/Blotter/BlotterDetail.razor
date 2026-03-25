@@ -1,0 +1,201 @@
+@page "/blotter/{Id:int}"
+@inject BlotterService BlotterService
+@inject AppDbContext DbContext
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Blotter Detail</PageTitle>
+
+<div class="page-shell">
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_entry is null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Blotter record not found.</MudAlert>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1 class="page-title">@_entry.BlotterNumber</h1>
+
+            <div class="page-header-actions">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="OpenStatusDialogAsync">
+                    Update Status
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="PrintBlotterPdfAsync">
+                    Print Blotter PDF
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Style="border-radius: 4px"
+                           OnClick="@(() => NavigationManager.NavigateTo($"/blotter/edit/{_entry.BlotterEntryId}"))">
+                    Edit
+                </MudButton>
+            </div>
+        </div>
+
+        <MudPaper Class="page-card" Elevation="0">
+            <div class="detail-grid">
+                <div class="detail-field">
+                    <div class="detail-label">Blotter Number</div>
+                    <div class="detail-value">@_entry.BlotterNumber</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Filed At</div>
+                    <div class="detail-value">@FormatDate(_entry.FiledAt)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Incident Date</div>
+                    <div class="detail-value">@FormatDate(_entry.IncidentDate)</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Incident Type</div>
+                    <div class="detail-value">@_entry.IncidentType</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Complainant</div>
+                    <div class="detail-value">@_entry.ComplainantName</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Respondent</div>
+                    <div class="detail-value">@_entry.RespondentName</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">@_entry.Status</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Filed By</div>
+                    <div class="detail-value">@(_entry.FiledByUser?.Username ?? "-")</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Incident Details</div>
+                    <div class="detail-value">@_entry.IncidentDetails</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-label">Resolution</div>
+                    <div class="detail-value">@(string.IsNullOrWhiteSpace(_entry.Resolution) ? "-" : _entry.Resolution)</div>
+                </div>
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private BlotterEntry? _entry;
+    private BarangaySettings? _settings;
+    private bool _isLoading = true;
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _entry = await BlotterService.GetBlotterByIdAsync(Id);
+        _settings = await DbContext.BarangaySettings.AsNoTracking().FirstOrDefaultAsync(settings => settings.SettingId == 1);
+        _isLoading = false;
+    }
+
+    private async Task OpenStatusDialogAsync()
+    {
+        if (_entry is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            [nameof(UpdateBlotterStatusDialog.CurrentStatus)] = _entry.Status,
+            [nameof(UpdateBlotterStatusDialog.CurrentResolution)] = _entry.Resolution
+        };
+
+        var options = new DialogOptions
+        {
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<UpdateBlotterStatusDialog>("Update Blotter Status", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled || result.Data is not UpdateBlotterStatusDialog.StatusDialogModel model)
+        {
+            return;
+        }
+
+        var updated = await BlotterService.UpdateBlotterStatusAsync(_entry.BlotterEntryId, model.Status, model.Resolution, CurrentUserId);
+        if (!updated)
+        {
+            Snackbar.Add("Blotter status could not be updated.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Blotter status updated.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task PrintBlotterPdfAsync()
+    {
+        if (_entry is null || _settings is null)
+        {
+            return;
+        }
+
+        var pdfBytes = await PdfExportHelper.GenerateBlotterPdfAsync(_entry, _settings);
+        var picker = new Windows.Storage.Pickers.FileSavePicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = _entry.BlotterNumber
+        };
+
+        picker.FileTypeChoices.Add("PDF Document", [".pdf"]);
+
+        var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault();
+        var platformWindow = mauiWindow?.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+        if (platformWindow is null)
+        {
+            Snackbar.Add("Save dialog is not available right now.", Severity.Error);
+            return;
+        }
+
+        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(platformWindow);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, windowHandle);
+
+        var file = await picker.PickSaveFileAsync();
+        if (file is null)
+        {
+            return;
+        }
+
+        await Windows.Storage.FileIO.WriteBytesAsync(file, pdfBytes);
+        Snackbar.Add("Blotter PDF saved.", Severity.Success);
+    }
+
+    private static string FormatDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMMM dd, yyyy")
+            : "-";
+    }
+}

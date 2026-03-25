@@ -1,0 +1,109 @@
+@inject AppDbContext DbContext
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string"
+                      Value="_searchTerm"
+                      Label="Search resident by name"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Immediate="true"
+                      ValueChanged="HandleSearchChangedAsync" />
+
+        <MudTable Items="_residents"
+                  Hover="true"
+                  Dense="true"
+                  Bordered="true"
+                  Striped="false"
+                  Class="mt-4">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Categories</MudTh>
+                <MudTh>Current Household</MudTh>
+                <MudTh>Action</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="resident">
+                <MudTd DataLabel="Name">@GetResidentName(resident)</MudTd>
+                <MudTd DataLabel="Status">@resident.Status</MudTd>
+                <MudTd DataLabel="Categories">@(string.IsNullOrWhiteSpace(resident.Categories) ? "-" : resident.Categories)</MudTd>
+                <MudTd DataLabel="Current Household">@(resident.Household?.HouseholdNumber ?? "-")</MudTd>
+                <MudTd DataLabel="Action">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               OnClick="@(() => SelectResident(resident.ResidentId))">
+                        Add
+                    </MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Class="pa-4">No residents matched the search.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int CurrentHouseholdId { get; set; }
+
+    private List<Resident> _residents = [];
+    private string _searchTerm = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadResidentsAsync();
+    }
+
+    private async Task HandleSearchChangedAsync(string value)
+    {
+        _searchTerm = value;
+        await LoadResidentsAsync();
+    }
+
+    private async Task LoadResidentsAsync()
+    {
+        var query = DbContext.Residents
+            .AsNoTracking()
+            .Include(resident => resident.Household)
+            .Where(resident => !resident.IsDeleted && resident.HouseholdId != CurrentHouseholdId);
+
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            var trimmedSearch = _searchTerm.Trim();
+            query = query.Where(resident =>
+                EF.Functions.Like(resident.FirstName, $"%{trimmedSearch}%") ||
+                EF.Functions.Like(resident.LastName, $"%{trimmedSearch}%") ||
+                (resident.MiddleName != null && EF.Functions.Like(resident.MiddleName, $"%{trimmedSearch}%")));
+        }
+
+        _residents = await query
+            .OrderBy(resident => resident.LastName)
+            .ThenBy(resident => resident.FirstName)
+            .Take(25)
+            .ToListAsync();
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void SelectResident(int residentId)
+    {
+        MudDialog.Close(DialogResult.Ok(residentId));
+    }
+
+    private static string GetResidentName(Resident resident)
+    {
+        return string.Join(" ", new[] { resident.FirstName, resident.MiddleName, resident.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}

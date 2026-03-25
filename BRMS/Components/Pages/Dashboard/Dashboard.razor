@@ -1,12 +1,408 @@
 @page "/dashboard"
+@inject ReportService ReportService
 
 <PageTitle>Dashboard</PageTitle>
 
-<div class="page-shell">
-    <h1 class="page-title">Dashboard</h1>
+<div class="dashboard-page">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Dashboard</h1>
+        <p class="dashboard-subtitle">Real-time overview of community metrics and engagement.</p>
+    </div>
 
-    <MudPaper Class="page-card" Elevation="0">
-        <MudText Typo="Typo.body1">BRMS Phase 1 is ready with authentication, data entities, the base layout shell, and seed data.</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Residents, households, engagement, clearance, and reporting workflows can now be added on top of this foundation.</MudText>
-    </MudPaper>
+    @if (_isLoading)
+    {
+        <MudPaper Class="dashboard-card dashboard-loading-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3" Class="dashboard-row">
+            @foreach (var card in PrimaryKpis)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="2">
+                    <MudPaper Class="dashboard-card dashboard-kpi-card" Elevation="0">
+                        <div class="dashboard-kpi-label">@card.Label</div>
+                        <div class="dashboard-kpi-value">@FormatValue(card.Value)</div>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudGrid Spacing="3" Class="dashboard-row">
+            @foreach (var card in EngagementCards)
+            {
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="@($"dashboard-card dashboard-engagement-card {card.AccentClass}")" Elevation="0">
+                        <div class="dashboard-engagement-label">@card.Label</div>
+                        <div class="dashboard-engagement-value">@FormatValue(card.Value)</div>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudGrid Spacing="3" Class="dashboard-row">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="dashboard-card dashboard-chart-card" Elevation="0">
+                    <h2 class="dashboard-section-title">Engagement Trend</h2>
+                    <MudChart T="double"
+                              ChartType="ChartType.Line"
+                              ChartSeries="_engagementTrendSeries"
+                              ChartLabels="_engagementTrendLabels"
+                              Width="100%"
+                              Height="320px" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Class="dashboard-card dashboard-chart-card" Elevation="0">
+                    <h2 class="dashboard-section-title">Monthly Event Attendance</h2>
+                    <MudChart T="double"
+                              ChartType="ChartType.Bar"
+                              ChartSeries="_attendanceTrendSeries"
+                              ChartLabels="_attendanceTrendLabels"
+                              Width="100%"
+                              Height="320px" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Spacing="3" Class="dashboard-row">
+            <MudItem xs="12">
+                <MudPaper Class="dashboard-card dashboard-status-card" Elevation="0">
+                    <h2 class="dashboard-section-title">Resident Status Breakdown</h2>
+
+                    <MudGrid Spacing="3" Class="dashboard-status-layout">
+                        <MudItem xs="12" md="5">
+                            <div class="dashboard-donut-container">
+                                <MudChart T="double"
+                                          ChartType="ChartType.Donut"
+                                          ChartSeries="_residentStatusSeries"
+                                          ChartLabels="_residentStatusLabels"
+                                          ChartOptions="_residentStatusChartOptions"
+                                          Width="100%"
+                                          Height="320px" />
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" md="7">
+                            <div class="dashboard-status-table-wrap">
+                                <table class="dashboard-status-table">
+                                    <thead>
+                                        <tr>
+                                            <th>CATEGORY</th>
+                                            <th class="dashboard-number-column">TOTAL COUNT</th>
+                                            <th class="dashboard-number-column">PERCENTAGE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in StatusRows)
+                                        {
+                                            <tr>
+                                                <td>@row.Category</td>
+                                                <td class="dashboard-number-column">@FormatValue(row.Count)</td>
+                                                <td class="dashboard-number-column">@row.Percentage</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
 </div>
+
+@code {
+    private readonly ChartOptions _residentStatusChartOptions = new()
+    {
+        ChartPalette = new[] { "#3B5BDB", "#94A3B8", "#F59E0B", "#EF4444" }
+    };
+
+    private DashboardKpis _kpis = new();
+    private ResidentStatusDistribution _statusDistribution = new();
+    private bool _isLoading = true;
+    private List<ChartSeries<double>> _engagementTrendSeries = [];
+    private string[] _engagementTrendLabels = [];
+    private List<ChartSeries<double>> _attendanceTrendSeries = [];
+    private string[] _attendanceTrendLabels = [];
+    private List<ChartSeries<double>> _residentStatusSeries = [];
+    private string[] _residentStatusLabels = [];
+
+    private IEnumerable<KpiCardItem> PrimaryKpis =>
+        new[]
+        {
+            new KpiCardItem("TOTAL RESIDENTS", _kpis.TotalResidents),
+            new KpiCardItem("TOTAL HOUSEHOLDS", _kpis.TotalHouseholds),
+            new KpiCardItem("NEW THIS MONTH", _kpis.NewResidentsThisMonth),
+            new KpiCardItem("OPEN BLOTTER CASES", _kpis.TotalBlotterOpen),
+            new KpiCardItem("PENDING CLEARANCES", _kpis.TotalClearancePending),
+            new KpiCardItem("EVENTS THIS MONTH", _kpis.TotalEventsThisMonth)
+        };
+
+    private IEnumerable<EngagementCardItem> EngagementCards =>
+        new[]
+        {
+            new EngagementCardItem("High Engagement", _kpis.HighEngagementCount, "dashboard-engagement-high"),
+            new EngagementCardItem("Medium Engagement", _kpis.MediumEngagementCount, "dashboard-engagement-medium"),
+            new EngagementCardItem("Low Engagement", _kpis.LowEngagementCount, "dashboard-engagement-low")
+        };
+
+    private IEnumerable<StatusTableRow> StatusRows =>
+        new[]
+        {
+            CreateStatusRow("Active", _statusDistribution.Active),
+            CreateStatusRow("Inactive", _statusDistribution.Inactive),
+            CreateStatusRow("Transferred", _statusDistribution.Transferred),
+            CreateStatusRow("Deceased", _statusDistribution.Deceased)
+        };
+
+    private int ResidentStatusTotal =>
+        _statusDistribution.Active +
+        _statusDistribution.Inactive +
+        _statusDistribution.Transferred +
+        _statusDistribution.Deceased;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        _isLoading = true;
+
+        _kpis = await ReportService.GetDashboardKpisAsync();
+
+        var engagementTrend = await ReportService.GetEngagementTrendAsync();
+        _engagementTrendLabels = engagementTrend.Select(point => point.Month).ToArray();
+        _engagementTrendSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Average Engagement Score",
+                Data = engagementTrend.Select(point => point.AvgScore).ToArray()
+            }
+        ];
+
+        var attendanceTrend = await ReportService.GetAttendanceTrendAsync();
+        _attendanceTrendLabels = attendanceTrend.Select(point => point.Month).ToArray();
+        _attendanceTrendSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Attendance Count",
+                Data = attendanceTrend.Select(point => Convert.ToDouble(point.Count)).ToArray()
+            }
+        ];
+
+        _statusDistribution = await ReportService.GetResidentStatusDistributionAsync();
+        _residentStatusLabels = ["Active", "Inactive", "Transferred", "Deceased"];
+        _residentStatusSeries =
+        [
+            new ChartSeries<double>
+            {
+                Name = "Residents",
+                Data = new double[]
+                {
+                    _statusDistribution.Active,
+                    _statusDistribution.Inactive,
+                    _statusDistribution.Transferred,
+                    _statusDistribution.Deceased
+                }
+            }
+        ];
+
+        _isLoading = false;
+    }
+
+    private StatusTableRow CreateStatusRow(string category, int count)
+    {
+        var percentage = ResidentStatusTotal == 0
+            ? "0.0%"
+            : $"{(double)count / ResidentStatusTotal:P1}";
+
+        return new StatusTableRow(category, count, percentage);
+    }
+
+    private static string FormatValue(int value)
+    {
+        return value.ToString("N0");
+    }
+
+    private sealed record KpiCardItem(string Label, int Value);
+
+    private sealed record EngagementCardItem(string Label, int Value, string AccentClass);
+
+    private sealed record StatusTableRow(string Category, int Count, string Percentage);
+}
+
+<style>
+    .dashboard-page {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        background: #F8F9FA;
+    }
+
+    .dashboard-header {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .dashboard-title {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #1E293B;
+    }
+
+    .dashboard-subtitle {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #64748B;
+    }
+
+    .dashboard-row {
+        margin: 0;
+    }
+
+    .dashboard-card {
+        height: 100%;
+        padding: 16px;
+        border: 1px solid #E2E8F0;
+        border-radius: 4px;
+        background: #FFFFFF;
+        box-shadow: none;
+    }
+
+    .dashboard-loading-card {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 140px;
+    }
+
+    .dashboard-kpi-label {
+        margin-bottom: 8px;
+        color: #64748B;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .dashboard-kpi-value {
+        color: #1E293B;
+        font-size: 1.875rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .dashboard-engagement-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border-left-width: 4px;
+        padding-left: 12px;
+    }
+
+    .dashboard-engagement-high {
+        border-left-color: #22C55E;
+    }
+
+    .dashboard-engagement-medium {
+        border-left-color: #F59E0B;
+    }
+
+    .dashboard-engagement-low {
+        border-left-color: #EF4444;
+    }
+
+    .dashboard-engagement-label {
+        color: #1E293B;
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+
+    .dashboard-engagement-value {
+        color: #1E293B;
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .dashboard-chart-card,
+    .dashboard-status-card {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .dashboard-section-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .dashboard-status-layout {
+        align-items: center;
+    }
+
+    .dashboard-donut-container {
+        width: 100%;
+        min-height: 320px;
+    }
+
+    .dashboard-status-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .dashboard-status-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #FFFFFF;
+    }
+
+    .dashboard-status-table thead tr,
+    .dashboard-status-table tbody tr {
+        background: #FFFFFF;
+    }
+
+    .dashboard-status-table th {
+        padding: 0 12px 12px;
+        color: #64748B;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-align: left;
+        border-bottom: 1px solid #E2E8F0;
+    }
+
+    .dashboard-status-table td {
+        padding: 14px 12px;
+        color: #1E293B;
+        font-size: 0.95rem;
+        border-bottom: 1px solid #E2E8F0;
+    }
+
+    .dashboard-status-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .dashboard-number-column {
+        text-align: right;
+    }
+
+    @@media (max-width: 959px) {
+        .dashboard-page {
+            gap: 20px;
+        }
+    }
+</style>

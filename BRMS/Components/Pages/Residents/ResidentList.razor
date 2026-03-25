@@ -1,0 +1,498 @@
+@page "/residents"
+@using Microsoft.Maui.Devices
+@using Microsoft.Maui.Storage
+@inject ResidentService ResidentService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Residents</PageTitle>
+
+<div class="residents-page">
+    <div class="residents-header">
+        <div>
+            <h1 class="residents-title">Residents</h1>
+        </div>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px;box-shadow:none;"
+                   OnClick="@(() => NavigationManager.NavigateTo("/residents/new"))">
+            Add Resident
+        </MudButton>
+    </div>
+
+    <MudGrid Spacing="2" Class="residents-filter-grid">
+        <MudItem xs="12" md="4">
+            <MudTextField T="string"
+                          Value="_searchName"
+                          ValueChanged="HandleSearchNameChangedAsync"
+                          Placeholder="Search by name..."
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Immediate="true"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="2">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedStatus"
+                       ValueChanged="HandleStatusChangedAsync"
+                       Variant="Variant.Outlined"
+                       Placeholder="All Status"
+                       FullWidth="true">
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="2">
+            <MudSelect T="int?" @onblur="StateHasChanged"
+                       Value="_selectedPurokId"
+                       ValueChanged="HandlePurokChangedAsync"
+                       Variant="Variant.Outlined"
+                       Placeholder="All Purok"
+                       FullWidth="true">
+                <MudSelectItem Value="@((int?)null)">All Purok</MudSelectItem>
+                @foreach (var purok in _puroks)
+                {
+                    <MudSelectItem Value="@((int?)purok.PurokId)">@purok.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="2">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedCategory"
+                       ValueChanged="HandleCategoryChangedAsync"
+                       Variant="Variant.Outlined"
+                       Placeholder="All Category"
+                       FullWidth="true">
+                @foreach (var category in CategoryOptions)
+                {
+                    <MudSelectItem Value="@category">@category</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="2" Class="residents-import-action">
+            <MudButton Variant="Variant.Outlined"
+                       FullWidth="true"
+                       Style="border-radius:4px;"
+                       OnClick="HandleImportCsvAsync">
+                Import CSV
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="Resident"
+              Items="_residents"
+              Dense="false"
+              Hover="true"
+              Striped="false"
+              Bordered="false"
+              Elevation="0"
+              Loading="_isLoading"
+              RowsPerPage="10"
+              RowStyle="height:52px"
+              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+              Class="resident-table">
+        <HeaderContent>
+            <MudTh>FULL NAME</MudTh>
+            <MudTh>AGE</MudTh>
+            <MudTh>GENDER</MudTh>
+            <MudTh>PUROK</MudTh>
+            <MudTh>HOUSEHOLD</MudTh>
+            <MudTh>STATUS</MudTh>
+            <MudTh>CATEGORIES</MudTh>
+            <MudTh>ACTIONS</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="resident">
+            <MudTd DataLabel="FULL NAME" Class="resident-name-cell">@GetDisplayName(resident)</MudTd>
+            <MudTd DataLabel="AGE" Class="resident-cell">@GetAge(resident.BirthDate)</MudTd>
+            <MudTd DataLabel="GENDER" Class="resident-cell">@resident.Gender</MudTd>
+            <MudTd DataLabel="PUROK" Class="resident-cell resident-nowrap">@(resident.Purok?.Name ?? "-")</MudTd>
+            <MudTd DataLabel="HOUSEHOLD" Class="resident-cell">@(resident.Household?.HouseholdNumber ?? "-")</MudTd>
+            <MudTd DataLabel="STATUS" Class="resident-cell">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Filled"
+                         Style="@GetStatusChipStyle(resident.Status)"
+                         Class="resident-status-chip">
+                    @resident.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="CATEGORIES" Class="resident-cell">
+                @if (GetCategoryChips(resident).Count == 0)
+                {
+                    <span>-</span>
+                }
+                else
+                {
+                    <div class="resident-category-list">
+                        @foreach (var category in GetCategoryChips(resident))
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Variant="Variant.Outlined"
+                                     Class="resident-category-chip">
+                                @category
+                            </MudChip>
+                        }
+                    </div>
+                }
+            </MudTd>
+            <MudTd DataLabel="ACTIONS" Class="resident-cell">
+                <div class="resident-actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#1E293B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/residents/{resident.ResidentId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#1E293B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/residents/edit/{resident.ResidentId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#EF4444;"
+                                   OnClick="@(() => PromptDeleteAsync(resident))" />
+                </div>
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <div class="resident-empty-state">No residents found.</div>
+        </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }"
+                           InfoFormat="Showing {first_item}-{last_item} of {all_items} residents" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private static readonly string[] StatusOptions =
+    [
+        "All Status",
+        "Active",
+        "Inactive",
+        "Transferred",
+        "Deceased"
+    ];
+
+    private static readonly string[] CategoryOptions =
+    [
+        "All Category",
+        "Senior",
+        "PWD",
+        "4Ps",
+        "Indigent",
+        "Youth"
+    ];
+
+    private static readonly FilePickerFileType CsvFileTypes = new(new Dictionary<DevicePlatform, IEnumerable<string>>
+    {
+        [DevicePlatform.WinUI] = new[] { ".csv" }
+    });
+
+    private List<Resident> _residents = [];
+    private List<Purok> _puroks = [];
+    private bool _isLoading = true;
+    private string _searchName = string.Empty;
+    private string _selectedStatus = StatusOptions[0];
+    private int? _selectedPurokId;
+    private string _selectedCategory = CategoryOptions[0];
+
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        _isLoading = true;
+
+        _puroks = await DbContext.Puroks
+            .AsNoTracking()
+            .OrderBy(purok => purok.Name)
+            .ToListAsync();
+
+        _residents = await ResidentService.GetAllResidentsAsync();
+        _isLoading = false;
+    }
+
+    private async Task HandleSearchNameChangedAsync(string value)
+    {
+        _searchName = value;
+        await SearchResidentsAsync();
+    }
+
+    private async Task HandleStatusChangedAsync(string value)
+    {
+        _selectedStatus = value;
+        await SearchResidentsAsync();
+    }
+
+    private async Task HandlePurokChangedAsync(int? value)
+    {
+        _selectedPurokId = value;
+        await SearchResidentsAsync();
+    }
+
+    private async Task HandleCategoryChangedAsync(string value)
+    {
+        _selectedCategory = value;
+        await SearchResidentsAsync();
+    }
+
+    private async Task SearchResidentsAsync()
+    {
+        _isLoading = true;
+        _residents = await ResidentService.SearchResidentsAsync(
+            _searchName,
+            NormalizeStatusFilter(_selectedStatus),
+            null,
+            _selectedPurokId,
+            NormalizeCategoryFilter(_selectedCategory));
+        _isLoading = false;
+    }
+
+    private async Task RefreshResidentsAsync()
+    {
+        if (HasActiveFilters())
+        {
+            await SearchResidentsAsync();
+            return;
+        }
+
+        _isLoading = true;
+        _residents = await ResidentService.GetAllResidentsAsync();
+        _isLoading = false;
+    }
+
+    private async Task HandleImportCsvAsync()
+    {
+        try
+        {
+            var file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select resident CSV",
+                FileTypes = CsvFileTypes
+            });
+
+            if (file is null)
+            {
+                return;
+            }
+
+            await using var stream = await file.OpenReadAsync();
+            var result = await ResidentService.ImportFromCsvAsync(stream, CurrentUserId);
+
+            await RefreshResidentsAsync();
+
+            var severity = result.ErrorCount == 0 ? Severity.Success : Severity.Warning;
+            Snackbar.Add($"Imported {result.SuccessCount} records. {result.ErrorCount} errors.", severity);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"CSV import failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task PromptDeleteAsync(Resident resident)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Resident",
+            [nameof(ConfirmDialog.Message)] = $"Delete {GetDisplayName(resident)} from the resident list?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Delete",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, () => ConfirmDeleteAsync(resident.ResidentId))
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.ExtraSmall
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task ConfirmDeleteAsync(int residentId)
+    {
+        var deleted = await ResidentService.SoftDeleteResidentAsync(residentId, CurrentUserId);
+        if (!deleted)
+        {
+            Snackbar.Add("Resident could not be deleted.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Resident deleted successfully.", Severity.Success);
+        await RefreshResidentsAsync();
+    }
+
+    private bool HasActiveFilters()
+    {
+        return !string.IsNullOrWhiteSpace(_searchName) ||
+               !string.IsNullOrWhiteSpace(NormalizeStatusFilter(_selectedStatus)) ||
+               _selectedPurokId.HasValue ||
+               !string.IsNullOrWhiteSpace(NormalizeCategoryFilter(_selectedCategory));
+    }
+
+    private static string NormalizeStatusFilter(string? value)
+    {
+        return string.Equals(value, "All Status", StringComparison.OrdinalIgnoreCase) ? string.Empty : value?.Trim() ?? string.Empty;
+    }
+
+    private static string NormalizeCategoryFilter(string? value)
+    {
+        return string.Equals(value, "All Category", StringComparison.OrdinalIgnoreCase) ? string.Empty : value?.Trim() ?? string.Empty;
+    }
+
+    private static string GetDisplayName(Resident resident)
+    {
+        var middleInitial = string.IsNullOrWhiteSpace(resident.MiddleName)
+            ? string.Empty
+            : $" {char.ToUpperInvariant(resident.MiddleName.Trim()[0])}.";
+
+        return $"{resident.LastName}, {resident.FirstName}{middleInitial}";
+    }
+
+    private static int GetAge(string birthDate)
+    {
+        if (!DateTime.TryParse(birthDate, out var parsedBirthDate))
+        {
+            return 0;
+        }
+
+        var age = DateTime.Today.Year - parsedBirthDate.Year;
+        if (parsedBirthDate.Date > DateTime.Today.AddYears(-age))
+        {
+            age--;
+        }
+
+        return Math.Max(age, 0);
+    }
+
+    private static string GetStatusChipStyle(string? status)
+    {
+        return status?.Trim() switch
+        {
+            "Active" => "background:#22C55E;color:#FFFFFF;box-shadow:none;",
+            "Inactive" => "background:#94A3B8;color:#FFFFFF;box-shadow:none;",
+            "Transferred" => "background:#3B5BDB;color:#FFFFFF;box-shadow:none;",
+            "Deceased" => "background:#EF4444;color:#FFFFFF;box-shadow:none;",
+            _ => "background:#94A3B8;color:#FFFFFF;box-shadow:none;"
+        };
+    }
+
+    private static IReadOnlyList<string> GetCategoryChips(Resident resident)
+    {
+        if (string.IsNullOrWhiteSpace(resident.Categories))
+        {
+            return Array.Empty<string>();
+        }
+
+        return resident.Categories
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .ToArray();
+    }
+}
+
+<style>
+    .residents-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .residents-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .residents-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .residents-filter-grid {
+        align-items: end;
+    }
+
+    .residents-import-action {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .residents-import-action .mud-button-root {
+        min-height: 56px;
+    }
+
+    .resident-table {
+        overflow: hidden;
+    }
+
+    .resident-name-cell,
+    .resident-cell {
+        color: #1E293B;
+    }
+
+    .resident-name-cell {
+        white-space: nowrap;
+        font-weight: 500;
+    }
+
+    .resident-nowrap {
+        white-space: nowrap;
+    }
+
+    .resident-status-chip {
+        font-weight: 600;
+    }
+
+    .resident-category-list {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .resident-category-chip {
+        color: #1E293B;
+        background: #FFFFFF;
+        box-shadow: none;
+    }
+
+    .resident-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .resident-empty-state {
+        padding: 24px 16px;
+        color: #64748B;
+    }
+</style>

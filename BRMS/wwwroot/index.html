@@ -5,6 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>BRMS</title>
     <base href="/" />
+    <script>
+      (function () {
+        if (window.__brmsPopoverFixInstalled) return;
+        window.__brmsPopoverFixInstalled = true;
+
+        document.addEventListener('mousedown', function (e) {
+          const openPopover = document.querySelector('.mud-popover-open');
+          if (!openPopover) return;
+
+          const clickedInsidePopover = e.target.closest('.mud-popover');
+          if (clickedInsidePopover) return;
+
+          const clickedExpandedActivator = e.target.closest('[aria-expanded="true"]');
+          if (clickedExpandedActivator) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+
+          document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+
+          if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+          }
+        }, true);
+      })();
+    </script>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="css/app.css" />
@@ -18,6 +45,15 @@
         <a class="dismiss">Close</a>
     </div>
 
+    <script>
+        function downloadFile(fileName, contentType, base64) {
+            const a = document.createElement('a');
+            a.href = 'data:' + contentType + ';base64,' + base64;
+            a.download = fileName;
+            a.click();
+        }
+    </script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 </html>

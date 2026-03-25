@@ -1,0 +1,435 @@
+@page "/residents/new"
+@page "/residents/edit/{Id:int}"
+@inject ResidentService ResidentService
+@inject AuthService AuthService
+@inject AppDbContext DbContext
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="page-shell">
+    <div class="page-header">
+        <h1 class="page-title">@PageTitleText</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="page-card" Elevation="0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">@_loadError</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0"
+                  Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF; padding: 24px;">
+            <EditForm Model="_model" OnValidSubmit="HandleSaveAsync">
+                <DataAnnotationsValidator />
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; margin-bottom: 12px; margin-top: 20px; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">
+                    Personal Information
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.FirstName"
+                                      For="@(() => _model.FirstName)"
+                                      Label="First Name*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.MiddleName"
+                                      Label="Middle Name"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.LastName"
+                                      For="@(() => _model.LastName)"
+                                      Label="Last Name*"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudDatePicker @bind-Date="_model.BirthDate"
+                                       For="@(() => _model.BirthDate)"
+                                       Label="Birth Date*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px; width: 100%;"
+                                       DateFormat="yyyy-MM-dd"
+                                       Editable="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.Gender"
+                                   For="@(() => _model.Gender)"
+                                   Label="Gender*"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            @foreach (var gender in GenderOptions)
+                            {
+                                <MudSelectItem Value="@gender">@gender</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.CivilStatus"
+                                   Label="Civil Status"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@("Single")">Single</MudSelectItem>
+                            <MudSelectItem Value="@("Married")">Married</MudSelectItem>
+                            <MudSelectItem Value="@("Widowed")">Widowed</MudSelectItem>
+                            <MudSelectItem Value="@("Separated")">Separated</MudSelectItem>
+                            <MudSelectItem Value="@("Annulled")">Annulled</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; margin-bottom: 12px; margin-top: 20px; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">
+                    Contact Details
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.ContactNumber"
+                                      Label="Contact Number"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Email"
+                                      Label="Email"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudTextField T="string"
+                                      @bind-Value="_model.Address"
+                                      Label="Address"
+                                      Variant="Variant.Outlined"
+                                      Style="border-radius: 4px"
+                                      FullWidth="true" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudText Typo="Typo.subtitle2"
+                         Style="color: #1E293B; font-weight: 600; margin-bottom: 12px; margin-top: 20px; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">
+                    Assignment &amp; Classification
+                </MudText>
+                <MudDivider Style="margin-bottom: 16px;" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   @bind-Value="_model.Status"
+                                   For="@(() => _model.Status)"
+                                   Label="Status*"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            @foreach (var status in StatusOptions)
+                            {
+                                <MudSelectItem Value="@status">@status</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int?" @onblur="StateHasChanged"
+                                   Value="_model.PurokId"
+                                   ValueChanged="HandlePurokChangedAsync"
+                                   Label="Purok"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@((int?)null)">None</MudSelectItem>
+                            @foreach (var purok in _puroks)
+                            {
+                                <MudSelectItem Value="@((int?)purok.PurokId)">@purok.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="int?" @onblur="StateHasChanged"
+                                   @bind-Value="_model.HouseholdId"
+                                   Label="Household"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true">
+                            <MudSelectItem Value="@((int?)null)">None</MudSelectItem>
+                            @foreach (var household in FilteredHouseholds)
+                            {
+                                <MudSelectItem Value="@((int?)household.HouseholdId)">
+                                    @($"{household.HouseholdNumber} - {household.Address}")
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="string" @onblur="StateHasChanged"
+                                   Label="Categories"
+                                   Variant="Variant.Outlined"
+                                   Style="border-radius: 4px"
+                                   FullWidth="true"
+                                   MultiSelection="true"
+                                   SelectedValues="_model.Categories"
+                                   SelectedValuesChanged="HandleCategoriesChanged">
+                            @foreach (var category in CategoryOptions)
+                            {
+                                <MudSelectItem Value="@category">@category</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="_model.ResidencySince"
+                                       For="@(() => _model.ResidencySince)"
+                                       Label="Residency Since*"
+                                       Variant="Variant.Outlined"
+                                       Style="border-radius: 4px; width: 100%;"
+                                       DateFormat="yyyy-MM-dd"
+                                       Editable="true" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Style="margin: 24px 0;" />
+
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px"
+                               OnClick="HandleCancel">
+                        Cancel
+                    </MudButton>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px"
+                               Disabled="_isSaving">
+                        Save
+                    </MudButton>
+                </div>
+            </EditForm>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private static readonly string[] GenderOptions = ["Male", "Female", "Other"];
+    private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
+    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+
+    private readonly ResidentFormModel _model = new();
+    private List<Purok> _puroks = [];
+    private List<Household> _households = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _loadError;
+
+    private bool IsEditMode => Id.HasValue;
+    private string PageTitleText => IsEditMode ? "Edit Resident" : "Add Resident";
+    private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+
+    private IEnumerable<Household> FilteredHouseholds =>
+        (_model.PurokId.HasValue
+            ? _households.Where(household => household.PurokId == _model.PurokId)
+            : _households)
+        .OrderBy(household => household.HouseholdNumber);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookupsAsync();
+
+        if (IsEditMode)
+        {
+            await LoadResidentAsync(Id!.Value);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        _puroks = await DbContext.Puroks
+            .AsNoTracking()
+            .OrderBy(purok => purok.Name)
+            .ToListAsync();
+
+        _households = await DbContext.Households
+            .AsNoTracking()
+            .OrderBy(household => household.HouseholdNumber)
+            .ToListAsync();
+    }
+
+    private async Task LoadResidentAsync(int id)
+    {
+        var resident = await ResidentService.GetResidentByIdAsync(id);
+        if (resident is null)
+        {
+            _loadError = "Resident not found.";
+            return;
+        }
+
+        _model.ResidentId = resident.ResidentId;
+        _model.FirstName = resident.FirstName;
+        _model.LastName = resident.LastName;
+        _model.MiddleName = resident.MiddleName;
+        _model.BirthDate = ParseDate(resident.BirthDate);
+        _model.Gender = resident.Gender;
+        _model.CivilStatus = resident.CivilStatus;
+        _model.ContactNumber = resident.ContactNumber;
+        _model.Email = resident.Email;
+        _model.Address = resident.Address;
+        _model.PurokId = resident.PurokId;
+        _model.HouseholdId = resident.HouseholdId;
+        _model.Status = resident.Status;
+        _model.Categories = resident.Categories?
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            ?? [];
+        _model.ResidencySince = ParseDate(resident.ResidencySince);
+    }
+
+    private Task HandlePurokChangedAsync(int? purokId)
+    {
+        _model.PurokId = purokId;
+
+        if (_model.HouseholdId.HasValue && !FilteredHouseholds.Any(household => household.HouseholdId == _model.HouseholdId.Value))
+        {
+            _model.HouseholdId = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void HandleCategoriesChanged(IEnumerable<string> categories)
+    {
+        _model.Categories = categories.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        var resident = new Resident
+        {
+            ResidentId = _model.ResidentId,
+            FirstName = _model.FirstName,
+            LastName = _model.LastName,
+            MiddleName = _model.MiddleName,
+            BirthDate = _model.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            Gender = _model.Gender,
+            CivilStatus = _model.CivilStatus,
+            ContactNumber = _model.ContactNumber,
+            Email = _model.Email,
+            Address = _model.Address,
+            PurokId = _model.PurokId,
+            HouseholdId = _model.HouseholdId,
+            Status = _model.Status,
+            Categories = _model.Categories.Count == 0 ? null : string.Join(", ", _model.Categories.OrderBy(category => category)),
+            ResidencySince = _model.ResidencySince?.ToString("yyyy-MM-dd") ?? string.Empty
+        };
+
+        if (IsEditMode)
+        {
+            var updated = await ResidentService.UpdateResidentAsync(resident);
+            if (!updated)
+            {
+                Snackbar.Add("Resident could not be updated.", Severity.Error);
+                _isSaving = false;
+                return;
+            }
+
+            Snackbar.Add("Resident updated.", Severity.Success);
+        }
+        else
+        {
+            await ResidentService.CreateResidentAsync(resident, CurrentUserId);
+            Snackbar.Add("Resident created.", Severity.Success);
+        }
+
+        _isSaving = false;
+        NavigationManager.NavigateTo("/residents");
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/residents");
+    }
+
+    private static DateTime? ParseDate(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate) ? parsedDate : null;
+    }
+
+    private sealed class ResidentFormModel
+    {
+        public int ResidentId { get; set; }
+
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+
+        public string? MiddleName { get; set; }
+
+        [Required]
+        public DateTime? BirthDate { get; set; }
+
+        [Required]
+        public string Gender { get; set; } = string.Empty;
+
+        public string? CivilStatus { get; set; }
+
+        public string? ContactNumber { get; set; }
+
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        public string? Address { get; set; }
+
+        public int? PurokId { get; set; }
+
+        public int? HouseholdId { get; set; }
+
+        [Required]
+        public string Status { get; set; } = "Active";
+
+        public HashSet<string> Categories { get; set; } = [];
+
+        [Required]
+        public DateTime? ResidencySince { get; set; }
+    }
+}

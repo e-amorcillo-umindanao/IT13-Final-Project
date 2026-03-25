@@ -1,0 +1,294 @@
+﻿@page "/events"
+@inject EventService EventService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Events & Programs</PageTitle>
+
+<div class="events-page">
+    <div class="events-header">
+        <h1 class="events-title">Events &amp; Programs</h1>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Style="border-radius:4px;box-shadow:none;"
+                   OnClick="@(() => NavigationManager.NavigateTo("/events/new"))">
+            Add Event
+        </MudButton>
+    </div>
+
+    <MudGrid Spacing="2" Class="events-filter-grid">
+        <MudItem xs="12" md="8">
+            <MudTextField T="string"
+                          Value="_searchTitle"
+                          ValueChanged="HandleSearchTitleChanged"
+                          Placeholder="Search by title..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="border-radius:4px"
+                          FullWidth="true"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudSelect T="string" @onblur="StateHasChanged"
+                       Value="_selectedEventType"
+                       ValueChanged="HandleEventTypeChanged"
+                       Variant="Variant.Outlined"
+                       Style="border-radius:4px"
+                       Label="Event Type"
+                       FullWidth="true">
+                @foreach (var option in EventTypeOptions)
+                {
+                    <MudSelectItem Value="@option">@option</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="Event"
+              Items="FilteredEvents"
+              Elevation="0"
+              Striped="false"
+              Hover="true"
+              RowStyle="height:52px"
+              RowsPerPage="10"
+              Style="border:1px solid #E2E8F0; border-radius:4px; background:#FFFFFF;"
+              Class="events-table">
+        <HeaderContent>
+            <MudTh>TITLE</MudTh>
+            <MudTh>TYPE</MudTh>
+            <MudTh>DATE</MudTh>
+            <MudTh>VENUE</MudTh>
+            <MudTh>ATTENDEES</MudTh>
+            <MudTh>ACTIONS</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="eventItem">
+            <MudTd DataLabel="TITLE" Class="events-cell-primary">@eventItem.Title</MudTd>
+            <MudTd DataLabel="TYPE">
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Outlined"
+                         Style="@GetEventTypeChipStyle(eventItem.EventType)">
+                    @eventItem.EventType
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="DATE" Class="events-cell-muted">@FormatDateTime(eventItem.EventDate)</MudTd>
+            <MudTd DataLabel="VENUE" Class="events-cell-primary">@(string.IsNullOrWhiteSpace(eventItem.Venue) ? "-" : eventItem.Venue)</MudTd>
+            <MudTd DataLabel="ATTENDEES" Class="events-cell-primary">@GetPresentAttendeeCount(eventItem)</MudTd>
+            <MudTd DataLabel="ACTIONS">
+                <div class="events-actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#64748B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/events/{eventItem.EventId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#64748B;"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/events/edit/{eventItem.EventId}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Default"
+                                   Style="color:#EF4444;"
+                                   OnClick="@(() => PromptDeleteAsync(eventItem))" />
+                </div>
+            </MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            <div class="events-empty-state">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large" Class="events-empty-icon" />
+                <div class="events-empty-title">No events found</div>
+                <div class="events-empty-message">No events matched the current filters.</div>
+            </div>
+        </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+</div>
+
+@code {
+    private static readonly string[] EventTypeOptions =
+    [
+        "All",
+        "Assembly",
+        "Livelihood",
+        "Health",
+        "Relief",
+        "Other"
+    ];
+
+    private List<Event> _events = [];
+    private string _searchTitle = string.Empty;
+    private string _selectedEventType = "All";
+
+    private IEnumerable<Event> FilteredEvents => _events.Where(eventItem =>
+    {
+        var matchesTitle = string.IsNullOrWhiteSpace(_searchTitle) ||
+                           eventItem.Title.Contains(_searchTitle, StringComparison.OrdinalIgnoreCase);
+        var matchesType = string.Equals(_selectedEventType, "All", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(eventItem.EventType, _selectedEventType, StringComparison.OrdinalIgnoreCase);
+        return matchesTitle && matchesType;
+    });
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventsAsync();
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        _events = await EventService.GetAllEventsAsync();
+    }
+
+    private void HandleSearchTitleChanged(string value)
+    {
+        _searchTitle = value;
+    }
+
+    private void HandleEventTypeChanged(string value)
+    {
+        _selectedEventType = value;
+    }
+
+    private async Task PromptDeleteAsync(Event eventItem)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Event",
+            [nameof(ConfirmDialog.Message)] = $"Delete {eventItem.Title}?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Delete",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, () => ConfirmDeleteAsync(eventItem.EventId))
+        };
+
+        var options = new DialogOptions
+        {
+            CloseOnEscapeKey = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.ExtraSmall
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters, options);
+    }
+
+    private async Task ConfirmDeleteAsync(int eventId)
+    {
+        var deleted = await EventService.DeleteEventAsync(eventId);
+        if (!deleted)
+        {
+            Snackbar.Add("Cannot delete - attendance records exist.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Event deleted successfully.", Severity.Success);
+        await LoadEventsAsync();
+    }
+
+    private static int GetPresentAttendeeCount(Event eventItem)
+    {
+        return eventItem.Attendances.Count(attendance =>
+            string.Equals(attendance.Status, "Present", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FormatDateTime(string? value)
+    {
+        return DateTime.TryParse(value, out var parsedDate)
+            ? parsedDate.ToString("MMM dd, yyyy hh:mm tt")
+            : "-";
+    }
+
+    private static string GetEventTypeChipStyle(string? eventType)
+    {
+        var color = eventType?.Trim() switch
+        {
+            "Assembly" => "#3B5BDB",
+            "Livelihood" => "#22C55E",
+            "Health" => "#EF4444",
+            "Relief" => "#F59E0B",
+            _ => "#94A3B8"
+        };
+
+        return $"border-radius:4px;color:{color};border-color:{color};background:#FFFFFF;";
+    }
+}
+
+<style>
+    .events-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #F8F9FA;
+    }
+
+    .events-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .events-title {
+        margin: 0;
+        color: #1E293B;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .events-filter-grid {
+        align-items: end;
+    }
+
+    .events-table {
+        overflow: hidden;
+    }
+
+    .events-cell-primary {
+        color: #1E293B;
+    }
+
+    .events-cell-muted {
+        color: #64748B;
+    }
+
+    .events-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .events-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 220px;
+        padding: 32px 16px;
+        text-align: center;
+    }
+
+    .events-empty-icon {
+        font-size: 48px;
+        color: #94A3B8;
+    }
+
+    .events-empty-title {
+        color: #1E293B;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .events-empty-message {
+        color: #64748B;
+        font-size: 0.95rem;
+    }
+</style>

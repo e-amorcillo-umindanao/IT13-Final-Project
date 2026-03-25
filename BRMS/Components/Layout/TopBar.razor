@@ -1,40 +1,66 @@
-@inject AuthService AuthService
+﻿@inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @implements IDisposable
 
 <div class="topbar-shell">
     <div class="topbar-brand">BRMS</div>
-    <div class="topbar-title">Barangay Catalunan Pequeño</div>
+    <div class="topbar-title">Barangay Catalunan Pequeno</div>
     <div class="topbar-user">
-        <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent>
-                <button type="button" class="topbar-user-button">
-                    <span>@CurrentUsername</span>
-                    <MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" />
-                </button>
-            </ActivatorContent>
-            <ChildContent>
-                <MudMenuItem OnClick="@HandleLogoutAsync">Logout</MudMenuItem>
-            </ChildContent>
-        </MudMenu>
+        <div class="topbar-user-menu-shell">
+            <MudButton Variant="Variant.Text"
+                       Style="color: #1E293B; font-weight: 500; text-transform: none; border-radius: 4px;"
+                       OnClick="ToggleUserMenu">
+                @CurrentUsername @((MarkupString)"&#9662;")
+            </MudButton>
+
+            @if (_userMenuOpen)
+            {
+                <MudPaper Elevation="0"
+                          Class="topbar-user-menu"
+                          Style="border: 1px solid #E2E8F0; border-radius: 4px; background: #FFFFFF;">
+                    <MudButton Variant="Variant.Text"
+                               FullWidth="true"
+                               Style="justify-content: flex-start; color: #1E293B; text-transform: none; border-radius: 4px;"
+                               OnClick="HandleLogoutAsync">
+                        Logout
+                    </MudButton>
+                </MudPaper>
+            }
+        </div>
     </div>
 </div>
 
 @code {
-    private string CurrentUsername => AuthService.CurrentUser?.Username ?? "Guest";
+    private User? currentUser => AuthService.CurrentUser;
+    private string CurrentUsername => currentUser?.Username ?? "Guest";
+    private bool _userMenuOpen;
 
     protected override void OnInitialized()
     {
         AuthService.AuthStateChanged += HandleAuthStateChanged;
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    private void ToggleUserMenu()
+    {
+        _userMenuOpen = !_userMenuOpen;
     }
 
     private void HandleAuthStateChanged()
     {
+        _userMenuOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _userMenuOpen = false;
         _ = InvokeAsync(StateHasChanged);
     }
 
     private async Task HandleLogoutAsync()
     {
+        _userMenuOpen = false;
         await AuthService.LogoutAsync();
         NavigationManager.NavigateTo("/login", false);
     }
@@ -42,6 +68,7 @@
     public void Dispose()
     {
         AuthService.AuthStateChanged -= HandleAuthStateChanged;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
     }
 }
 
@@ -75,17 +102,17 @@
         justify-self: end;
     }
 
-    .topbar-user-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 8px 10px;
-        border: 1px solid #E2E8F0;
-        border-radius: 4px;
-        background: #FFFFFF;
-        color: #0F172A;
-        font: inherit;
-        cursor: pointer;
+    .topbar-user-menu-shell {
+        position: relative;
+    }
+
+    .topbar-user-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        min-width: 140px;
+        padding: 6px;
+        z-index: 100;
     }
 
     @@media (max-width: 900px) {
