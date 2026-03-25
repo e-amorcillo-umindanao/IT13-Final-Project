@@ -9,31 +9,37 @@
 
 <div class="clearance-page">
     <div class="clearance-header">
-        <h1 class="clearance-title">Barangay Clearance</h1>
+        <h1 class="clearance-title">@ClearanceTitle</h1>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Style="border-radius:4px;box-shadow:none;"
-                   OnClick="@(() => NavigationManager.NavigateTo("/clearance/new"))">
-            New Request
-        </MudButton>
+        @if (CanCreateRequest)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Style="border-radius:4px;box-shadow:none;"
+                       OnClick="@(() => NavigationManager.NavigateTo("/clearance/new"))">
+                New Request
+            </MudButton>
+        }
     </div>
 
     <MudGrid Spacing="2" Class="clearance-filter-grid">
-        <MudItem xs="12" md="8">
-            <MudTextField T="string"
-                          Value="_searchName"
-                          ValueChanged="HandleSearchNameChanged"
-                          Placeholder="Search by resident name..."
-                          Variant="Variant.Outlined"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Style="border-radius:4px"
-                          FullWidth="true"
-                          Immediate="true" />
-        </MudItem>
+        @if (!IsResidentUser)
+        {
+            <MudItem xs="12" md="8">
+                <MudTextField T="string"
+                              Value="_searchName"
+                              ValueChanged="HandleSearchNameChanged"
+                              Placeholder="Search by resident name..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Style="border-radius:4px"
+                              FullWidth="true"
+                              Immediate="true" />
+            </MudItem>
+        }
 
-        <MudItem xs="12" md="4">
+        <MudItem xs="12" md="@(IsResidentUser ? 12 : 4)">
             <MudSelect T="string" @onblur="StateHasChanged"
                        Value="_selectedStatus"
                        ValueChanged="HandleStatusChanged"
@@ -176,7 +182,7 @@
                 Approve
             </MudButton>
         }
-        @if (_selectedRequest is not null && _selectedRequest.Status == "Approved")
+        @if (_selectedRequest is not null && _selectedRequest.Status == "Approved" && !IsResidentUser)
         {
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
@@ -311,8 +317,12 @@
     private bool CanProcess =>
         string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(AuthService.GetCurrentRole(), "Kagawad", StringComparison.OrdinalIgnoreCase);
+    private bool IsResidentUser => string.Equals(AuthService.GetCurrentRole(), "Resident", StringComparison.OrdinalIgnoreCase);
+    private bool CanCreateRequest => !IsResidentUser;
+    private string ClearanceTitle => IsResidentUser ? "My Clearance Status" : "Barangay Clearance";
 
     private int CurrentUserId => AuthService.CurrentUser?.UserId ?? 1;
+    private int? CurrentResidentId => AuthService.CurrentUser?.ResidentId;
 
     private IEnumerable<ClearanceRequest> FilteredRequests =>
         _requests.Where(request =>
@@ -332,7 +342,18 @@
     private async Task LoadRequestsAsync()
     {
         _isLoading = true;
-        _requests = await ClearanceService.GetAllClearanceRequestsAsync();
+
+        if (IsResidentUser)
+        {
+            _requests = CurrentResidentId.HasValue
+                ? await ClearanceService.GetClearancesByResidentAsync(CurrentResidentId.Value)
+                : [];
+        }
+        else
+        {
+            _requests = await ClearanceService.GetAllClearanceRequestsAsync();
+        }
+
         _isLoading = false;
     }
 
@@ -351,6 +372,14 @@
         _detailsDialogOpen = true;
         _dialogLoading = true;
         _selectedRequest = await ClearanceService.GetClearanceByIdAsync(clearanceId);
+
+        if (IsResidentUser && CurrentResidentId.HasValue && _selectedRequest?.ResidentId != CurrentResidentId.Value)
+        {
+            Snackbar.Add("You can only view your own clearance requests.", Severity.Error);
+            CloseDetailsDialog();
+            return;
+        }
+
         _settings = await DbContext.BarangaySettings
             .AsNoTracking()
             .FirstOrDefaultAsync(settings => settings.SettingId == 1);

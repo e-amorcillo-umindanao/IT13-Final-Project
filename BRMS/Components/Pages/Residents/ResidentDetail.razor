@@ -1,4 +1,6 @@
+@page "/profile"
 @page "/residents/{Id:int}"
+@inject AuthService AuthService
 @inject ResidentService ResidentService
 @inject AppDbContext DbContext
 @inject NavigationManager NavigationManager
@@ -12,6 +14,10 @@
             <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
         </MudPaper>
     }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">@_loadError</MudAlert>
+    }
     else if (_resident is null)
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Resident not found.</MudAlert>
@@ -21,20 +27,23 @@
         <div class="page-header">
             <h1 class="page-title">@ResidentName</h1>
 
-            <div class="page-header-actions">
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Primary"
-                           Style="border-radius: 4px"
-                           OnClick="@(() => NavigationManager.NavigateTo($"/residents/edit/{_resident.ResidentId}"))">
-                    Edit
-                </MudButton>
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Style="border-radius: 4px"
-                           OnClick="@(() => NavigationManager.NavigateTo($"/engagement/log/{_resident.ResidentId}"))">
-                    Log Interaction
-                </MudButton>
-            </div>
+            @if (ShowManagementActions)
+            {
+                <div class="page-header-actions">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px"
+                               OnClick="@(() => NavigationManager.NavigateTo($"/residents/edit/{_resident.ResidentId}"))">
+                        Edit
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Style="border-radius: 4px"
+                               OnClick="@(() => NavigationManager.NavigateTo($"/engagement/log/{_resident.ResidentId}"))">
+                        Log Interaction
+                    </MudButton>
+                </div>
+            }
         </div>
 
         <MudPaper Elevation="0"
@@ -142,25 +151,28 @@
 
         <MudPaper Class="page-card" Elevation="0">
             <MudTabs Rounded="false">
-                <MudTabPanel Text="Interaction History">
-                    @if (_orderedInteractions.Count == 0)
-                    {
-                        <MudText Typo="Typo.body2">No interaction history found.</MudText>
-                    }
-                    else
-                    {
-                        <div class="history-list">
-                            @foreach (var interaction in _orderedInteractions)
-                            {
-                                <div class="history-item">
-                                    <div class="history-item-title">@interaction.InteractionType</div>
-                                    <div class="history-item-meta">@FormatDate(interaction.InteractionDate)</div>
-                                    <MudText Typo="Typo.body2">@interaction.Notes</MudText>
-                                </div>
-                            }
-                        </div>
-                    }
-                </MudTabPanel>
+                @if (ShowInteractionHistory)
+                {
+                    <MudTabPanel Text="Interaction History">
+                        @if (_orderedInteractions.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2">No interaction history found.</MudText>
+                        }
+                        else
+                        {
+                            <div class="history-list">
+                                @foreach (var interaction in _orderedInteractions)
+                                {
+                                    <div class="history-item">
+                                        <div class="history-item-title">@interaction.InteractionType</div>
+                                        <div class="history-item-meta">@FormatDate(interaction.InteractionDate)</div>
+                                        <MudText Typo="Typo.body2">@interaction.Notes</MudText>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </MudTabPanel>
+                }
 
                 <MudTabPanel Text="Event Attendance History">
                     @if (_orderedAttendances.Count == 0)
@@ -208,17 +220,21 @@
 
 @code {
     [Parameter]
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     private Resident? _resident;
     private bool _isLoading = true;
+    private string? _loadError;
     private int _engagementScore;
     private List<InteractionLog> _orderedInteractions = [];
     private List<Attendance> _orderedAttendances = [];
     private List<ClearanceRequest> _orderedClearances = [];
+    private bool IsResidentUser => string.Equals(AuthService.GetCurrentRole(), "Resident", StringComparison.OrdinalIgnoreCase);
+    private bool ShowManagementActions => !IsResidentUser;
+    private bool ShowInteractionHistory => !IsResidentUser;
 
     private string ResidentName => _resident is null
-        ? "Resident Details"
+        ? (IsResidentUser ? "My Profile" : "Resident Details")
         : string.Join(" ", new[] { _resident.FirstName, _resident.MiddleName, _resident.LastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
 
     private IReadOnlyList<string> ResidentCategories =>
@@ -230,9 +246,27 @@
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        _resident = await ResidentService.GetResidentByIdAsync(Id);
+        _isLoading = true;
+        _loadError = null;
+        _resident = null;
+        _engagementScore = 0;
+        _orderedInteractions = [];
+        _orderedAttendances = [];
+        _orderedClearances = [];
+
+        var targetResidentId = ResolveTargetResidentId();
+        if (!targetResidentId.HasValue)
+        {
+            _loadError = IsResidentUser
+                ? "No resident profile is linked to this account."
+                : "Resident not found.";
+            _isLoading = false;
+            return;
+        }
+
+        _resident = await ResidentService.GetResidentByIdAsync(targetResidentId.Value);
 
         if (_resident is not null)
         {
@@ -250,8 +284,28 @@
 
             await CalculateEngagementAsync();
         }
+        else if (IsResidentUser)
+        {
+            _loadError = "Your resident profile could not be found.";
+        }
 
         _isLoading = false;
+    }
+
+    private int? ResolveTargetResidentId()
+    {
+        if (!IsResidentUser)
+        {
+            return Id;
+        }
+
+        var currentResidentId = AuthService.CurrentUser?.ResidentId;
+        if (!currentResidentId.HasValue)
+        {
+            return null;
+        }
+
+        return currentResidentId.Value;
     }
 
     private async Task CalculateEngagementAsync()

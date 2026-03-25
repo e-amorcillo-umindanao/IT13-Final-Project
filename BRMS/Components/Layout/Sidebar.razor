@@ -5,37 +5,120 @@
     <div class="sidebar-brand">BRMS</div>
 
     <nav class="sidebar-nav">
-        @foreach (var item in VisibleItems)
+        @if (CanViewDashboard)
         {
-            <NavLink href="@item.Href" Match="@item.Match" class="sidebar-link">
-                <MudIcon Icon="@item.Icon" Size="Size.Medium" />
-                <span>@item.Label</span>
+            <NavLink href="/dashboard" Match="NavLinkMatch.All" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.SpaceDashboard" Size="Size.Medium" />
+                <span>Dashboard</span>
+            </NavLink>
+        }
+
+        @if (CanViewProfile)
+        {
+            <NavLink href="/profile" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Medium" />
+                <span>Profile</span>
+            </NavLink>
+        }
+
+        @if (CanViewResidents)
+        {
+            <NavLink href="/residents" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.PeopleAlt" Size="Size.Medium" />
+                <span>Residents</span>
+            </NavLink>
+        }
+
+        @if (CanViewHouseholds)
+        {
+            <NavLink href="/households" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.HomeWork" Size="Size.Medium" />
+                <span>Households</span>
+            </NavLink>
+        }
+
+        @if (CanViewEngagement)
+        {
+            <NavLink href="/engagement" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Handshake" Size="Size.Medium" />
+                <span>Engagement</span>
+            </NavLink>
+        }
+
+        @if (CanViewEvents)
+        {
+            <NavLink href="/events" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Medium" />
+                <span>Events</span>
+            </NavLink>
+        }
+
+        @if (CanViewBlotter)
+        {
+            <NavLink href="/blotter" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Medium" />
+                <span>Blotter</span>
+            </NavLink>
+        }
+
+        @if (CanViewClearance)
+        {
+            <NavLink href="/clearance" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Size="Size.Medium" />
+                <span>Clearance</span>
+            </NavLink>
+        }
+
+        @if (CanViewDocuments)
+        {
+            <NavLink href="/documents" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Medium" />
+                <span>Documents</span>
+            </NavLink>
+        }
+
+        @if (CanViewReports)
+        {
+            <NavLink href="/reports" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Medium" />
+                <span>Reports</span>
+            </NavLink>
+        }
+
+        @if (CanViewSettings)
+        {
+            <NavLink href="/settings" Match="NavLinkMatch.Prefix" class="sidebar-link">
+                <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Medium" />
+                <span>Settings</span>
             </NavLink>
         }
     </nav>
 </div>
 
 @code {
-    private readonly IReadOnlyList<NavItem> _navItems =
-    [
-        new("Dashboard", "/dashboard", Icons.Material.Filled.SpaceDashboard, NavLinkMatch.All),
-        new("Residents", "/residents", Icons.Material.Filled.PeopleAlt, NavLinkMatch.Prefix),
-        new("Households", "/households", Icons.Material.Filled.HomeWork, NavLinkMatch.Prefix),
-        new("Engagement", "/engagement", Icons.Material.Filled.Handshake, NavLinkMatch.Prefix),
-        new("Events", "/events", Icons.Material.Filled.Event, NavLinkMatch.Prefix),
-        new("Blotter", "/blotter", Icons.Material.Filled.Gavel, NavLinkMatch.Prefix),
-        new("Clearance", "/clearance", Icons.Material.Filled.VerifiedUser, NavLinkMatch.Prefix),
-        new("Documents", "/documents", Icons.Material.Filled.Description, NavLinkMatch.Prefix),
-        new("Reports", "/reports", Icons.Material.Filled.BarChart, NavLinkMatch.Prefix),
-        new("Settings", "/settings", Icons.Material.Filled.Settings, NavLinkMatch.Prefix, true)
-    ];
+    private string CurrentRole => AuthService.GetCurrentRole();
 
-    private IEnumerable<NavItem> VisibleItems =>
-        _navItems.Where(item => !item.CaptainOnly || string.Equals(AuthService.GetCurrentRole(), "Captain", StringComparison.OrdinalIgnoreCase));
+    private bool CanViewDashboard => IsInRole("Captain", "Kagawad", "Staff", "Resident");
+    private bool CanViewProfile => IsInRole("Resident");
+    private bool CanViewResidents => IsInRole("Captain", "Kagawad", "Staff");
+    private bool CanViewHouseholds => IsInRole("Captain", "Kagawad", "Staff");
+    private bool CanViewEngagement => IsInRole("Captain", "Kagawad");
+    private bool CanViewEvents => IsInRole("Captain", "Kagawad", "Staff");
+    private bool CanViewBlotter => IsInRole("Captain", "Kagawad");
+    private bool CanViewClearance => IsInRole("Captain", "Kagawad", "Staff", "Resident");
+    private bool CanViewDocuments => IsInRole("Captain", "Kagawad", "Staff");
+    private bool CanViewReports => IsInRole("Captain", "Kagawad", "Staff");
+    private bool CanViewSettings => IsInRole("Captain");
 
     protected override void OnInitialized()
     {
         AuthService.AuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private bool IsInRole(params string[] allowedRoles)
+    {
+        return allowedRoles.Any(role =>
+            string.Equals(CurrentRole, role, StringComparison.OrdinalIgnoreCase));
     }
 
     private void HandleAuthStateChanged()
@@ -47,8 +130,6 @@
     {
         AuthService.AuthStateChanged -= HandleAuthStateChanged;
     }
-
-    private sealed record NavItem(string Label, string Href, string Icon, NavLinkMatch Match, bool CaptainOnly = false);
 }
 
 <style>

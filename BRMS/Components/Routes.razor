@@ -52,14 +52,86 @@
 
         if (!isAuthPath && !AuthService.IsAuthenticated)
         {
-            NavigationManager.NavigateTo("/login", false);
+            NavigateIfNeeded("/login", relativePath);
             return;
         }
 
         if (isAuthPath && AuthService.IsAuthenticated)
         {
-            NavigationManager.NavigateTo("/dashboard", false);
+            NavigateIfNeeded("/dashboard", relativePath);
+            return;
         }
+
+        if (!isAuthPath && AuthService.IsAuthenticated && !CanAccessPath(relativePath))
+        {
+            NavigateIfNeeded(GetDefaultRouteForCurrentUser(), relativePath);
+        }
+    }
+
+    private bool CanAccessPath(string relativePath)
+    {
+        var normalizedPath = relativePath.Trim('/');
+        if (string.IsNullOrWhiteSpace(normalizedPath) || string.Equals(normalizedPath, "login", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var segment = normalizedPath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault()?
+            .ToLowerInvariant();
+
+        return segment switch
+        {
+            "dashboard" => IsInRole("Captain", "Kagawad", "Staff", "Resident"),
+            "profile" => IsInRole("Resident"),
+            "residents" => IsInRole("Captain", "Kagawad", "Staff"),
+            "households" => IsInRole("Captain", "Kagawad", "Staff"),
+            "engagement" => IsInRole("Captain", "Kagawad"),
+            "events" => IsInRole("Captain", "Kagawad", "Staff"),
+            "blotter" => IsInRole("Captain", "Kagawad"),
+            "clearance" => CanAccessClearancePath(normalizedPath),
+            "documents" => IsInRole("Captain", "Kagawad", "Staff"),
+            "reports" => IsInRole("Captain", "Kagawad", "Staff"),
+            "settings" => IsInRole("Captain"),
+            _ => true
+        };
+    }
+
+    private bool CanAccessClearancePath(string normalizedPath)
+    {
+        if (IsInRole("Captain", "Kagawad", "Staff"))
+        {
+            return true;
+        }
+
+        return IsInRole("Resident") &&
+               string.Equals(normalizedPath, "clearance", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetDefaultRouteForCurrentUser()
+    {
+        return IsInRole("Resident") ? "/profile" : "/dashboard";
+    }
+
+    private bool IsInRole(params string[] allowedRoles)
+    {
+        var currentRole = AuthService.GetCurrentRole();
+        return allowedRoles.Any(role =>
+            string.Equals(currentRole, role, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void NavigateIfNeeded(string targetPath, string currentRelativePath)
+    {
+        var normalizedCurrentPath = currentRelativePath.Trim('/');
+        var normalizedTargetPath = targetPath.Trim('/');
+
+        if (string.Equals(normalizedCurrentPath, normalizedTargetPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        NavigationManager.NavigateTo(targetPath, false);
     }
 
     public void Dispose()
