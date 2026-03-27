@@ -49,6 +49,53 @@
             </div>
         </EditForm>
 
+        <MudDivider Class="my-3" />
+
+        <p class="login-quick-fill-label">Quick Fill (Demo)</p>
+
+        <div class="login-quick-fill-row">
+            <MudButton ButtonType="ButtonType.Button"
+                       Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       DropShadow="false"
+                       Class="login-quick-fill-button"
+                       Style="border-radius: 4px; min-width: 0; padding-inline: 10px; text-transform: none;"
+                       OnClick='@(() => FillCredentials("admin", "admin123"))'>
+                Captain
+            </MudButton>
+            <MudButton ButtonType="ButtonType.Button"
+                       Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       DropShadow="false"
+                       Class="login-quick-fill-button"
+                       Style="border-radius: 4px; min-width: 0; padding-inline: 10px; text-transform: none;"
+                       OnClick='@(() => FillCredentials("kagawad_ana", "kagawad123"))'>
+                Kagawad
+            </MudButton>
+            <MudButton ButtonType="ButtonType.Button"
+                       Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       DropShadow="false"
+                       Class="login-quick-fill-button"
+                       Style="border-radius: 4px; min-width: 0; padding-inline: 10px; text-transform: none;"
+                       OnClick='@(() => FillCredentials("staff_mila", "staff123"))'>
+                Staff
+            </MudButton>
+            <MudButton ButtonType="ButtonType.Button"
+                       Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       DropShadow="false"
+                       Class="login-quick-fill-button"
+                       Style="border-radius: 4px; min-width: 0; padding-inline: 10px; text-transform: none;"
+                       OnClick='@(() => FillCredentials("resident_angela", "resident123"))'>
+                Resident
+            </MudButton>
+        </div>
+
         <MudText Class="login-footer">&#169; Barangay Catalunan Peque&#241;o</MudText>
     </MudPaper>
 </div>
@@ -92,6 +139,13 @@
     private void TogglePasswordVisibility()
     {
         _showPassword = !_showPassword;
+    }
+
+    private void FillCredentials(string username, string password)
+    {
+        _model.Username = username;
+        _model.Password = password;
+        StateHasChanged();
     }
 
     private sealed class LoginFormModel
@@ -161,6 +215,25 @@
     .login-button:focus-visible {
         background: #3B5BDB;
         box-shadow: none;
+    }
+
+    .login-quick-fill-label {
+        margin: 0 0 8px;
+        color: #94A3B8;
+        font-size: 0.7rem;
+        font-weight: 400;
+        text-align: center;
+    }
+
+    .login-quick-fill-row {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    .login-quick-fill-button {
+        white-space: nowrap;
     }
 
     .login-footer {
